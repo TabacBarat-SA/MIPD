@@ -54,8 +54,6 @@ def grafico_pedidos_por_cliente(pedidos):
 def grafico_importes(pedidos):
     print(pedidos["importe"].describe())
 
-    # Se recorta en el percentil 99 solo para dibujar: unos pocos
-    # importes enormes aplastarían el histograma.
     limite = pedidos["importe"].quantile(0.99)
     importes = pedidos.loc[pedidos["importe"] <= limite, "importe"]
     print(f"Percentil 99: {limite:.2f} | pedidos fuera del gráfico: "

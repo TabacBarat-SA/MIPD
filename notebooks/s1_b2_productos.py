@@ -34,7 +34,6 @@ def ranking_categorias(items, productos, n=15):
     ventas = items[["order_id", "product_id", "price"]].merge(
         productos, on="product_id", how="left")
 
-    # Cada artículo debe conservar su fila
     assert ventas.shape[0] == items.shape[0]
 
     por_categoria = (ventas
@@ -57,7 +56,7 @@ def ranking_categorias(items, productos, n=15):
 def grafico_categorias(top):
     plt.figure(figsize=(9, 6))
     plt.barh(top.index, top["articulos"])
-    plt.gca().invert_yaxis()  # la categoría con más ventas arriba
+    plt.gca().invert_yaxis()
     plt.xlabel("Nº de artículos vendidos")
     plt.title("Las 15 categorías con más ventas")
     plt.tight_layout()
