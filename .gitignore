@@ -1,0 +1,14 @@
+# Datos (no se suben)
+data/
+datos/
+
+# Entorno virtual
+.venv/
+
+# Editor
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
