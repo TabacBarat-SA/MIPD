@@ -1,0 +1,87 @@
+# Rutas son relativas a la raíz del proyecto (PROJECT_ROOT)
+# config.py las resuelve automáticamente.
+
+# ─── Rutas de entrada ────────────────────────────────────────────────────────
+datos:
+  processed_dir: "data_processing/data/processed"
+  clientes_train: "clientes_train.parquet"
+  clientes_val:   "clientes_val.parquet"
+  clientes_test:  "clientes_test.parquet"
+  interacciones_train: "interacciones_train.parquet"
+  interacciones_val:   "interacciones_val.parquet"
+  interacciones_test:  "interacciones_test.parquet"
+  productos:      "productos.parquet"
+  metadata:       "metadata.json"
+
+# ─── Nombres de columnas (contrato de entrada real, verificado en PASO 0) ────
+columnas:
+  # clientes_*.parquet
+  cliente_idx:        "customer_idx"   # índice entero del cliente (0-93356)
+  clv_target:         "clv_log"        # log1p(clv_futuro) ya calculado por data-processing
+  clv_futuro:         "clv_futuro"     # CLV en escala original (BRL)
+  features_cliente:
+    - "frecuencia"
+    - "importe_total"
+    - "ticket_medio"
+    - "cuotas_media"
+    - "estado_idx"
+    - "recencia_dias"
+    - "antiguedad_dias"
+    - "dias_entre_pedidos"
+    - "n_categorias"
+  # interacciones_*.parquet
+  interaccion_cliente_idx: "customer_idx"
+  interaccion_producto_idx: "product_idx"
+  interaccion_fecha:        "fecha"
+  # productos.parquet
+  producto_idx:    "product_idx"
+  producto_cat_idx: "categoria_idx"
+
+# ─── Salidas ──────────────────────────────────────────────────────────────────
+artifacts_dir: "neural-network/artifacts"
+
+# ─── Modelo ──────────────────────────────────────────────────────────────────
+modelo:
+  n_clientes: 93357      # customer_idx va de 0 a 93356
+  n_productos: 32216     # product_idx va de 0 a 32215
+  n_estados:  27         # estado_idx va de 0 a 26
+  dim_embedding: 64      # dimensión de los embeddings de cliente y producto
+  usar_features: true    # concatenar features numéricas al embedding
+  n_features_cliente: 9  # longitud de features_cliente
+  capas_tronco: [128, 64]  # MLP compartido (vacío = sin tronco compartido)
+  dropout: 0.3
+  usar_layer_norm: true
+
+# ─── Entrenamiento ────────────────────────────────────────────────────────────
+entrenamiento:
+  semilla: 42
+  batch_size: 512
+  n_epocas: 30
+  lr: 0.001
+  weight_decay: 0.0001
+  grad_clip: 5.0           # clipping de gradientes (0 = sin clipping)
+  lambda_rec: 1.0          # peso de la pérdida de recomendación
+  huber_delta: 1.0         # delta para HuberLoss en CLV
+  k_negativos: 4           # negativos por cada positivo
+
+# ─── Early stopping ───────────────────────────────────────────────────────────
+early_stopping:
+  patience: 5
+  min_delta: 0.0001
+
+# ─── Evaluación de recomendación ──────────────────────────────────────────────
+evaluacion:
+  k_valores: [5, 10, 20]  # Precision@K y NDCG@K para estos K
+  semilla_negativos_val: 123   # semilla fija para negativos de val/test
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+logging:
+  curvas_csv: "training_curves.csv"
+  curvas_png: "training_curves.png"
+  metrics_clv_json: "metrics_clv.json"
+  metrics_rec_json: "metrics_rec.json"
+  predictions_clv_csv: "predictions_clv.csv"
+  predictions_rec_csv: "predictions_rec.csv"
+  customer_embeddings_npy: "customer_embeddings.npy"
+  product_embeddings_npy: "product_embeddings.npy"
+  model_checkpoint: "model.pt"

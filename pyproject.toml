@@ -5,6 +5,20 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=2.4.6",
-    "pandas>=3.0.6",
+    "numpy>=2.4.6",       # Operaciones numéricas y exportación de embeddings (.npy)
+    "pandas>=3.0.6",      # Lectura/manipulación de DataFrames
+    "pyarrow>=25.0.1",    # Motor de lectura de archivos Parquet
+    "torch>=2.0.0",       # Framework de deep learning (red neuronal multi-tarea)
+    "scipy>=1.11.0",      # Correlación de Spearman y otras métricas estadísticas
+    "pyyaml>=6.0.0",      # Carga de config.yaml (configuración del módulo)
+    "matplotlib>=3.7.0",  # Generación de gráficas de curvas de entrenamiento
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",  # Ejecución de tests unitarios (datos sintéticos, no parquet reales)
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["neural-network/src"]
+testpaths = ["neural-network/tests"]
