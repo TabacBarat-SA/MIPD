@@ -145,25 +145,42 @@ def evaluar_recomendacion(
             # ── Ranking del modelo ────────────────────────────────────── #
             feat = None
             if features_map is not None:
-                feat = features_map.get(c)  # shape (n_features,) o None
+                if isinstance(features_map, dict):
+                    feat = features_map.get(c)
+                elif isinstance(features_map, torch.Tensor):
+                    feat = features_map[c] if 0 <= c < len(features_map) else None
+                elif hasattr(features_map, "__getitem__"):
+                    try:
+                        feat = features_map[c]
+                    except (IndexError, KeyError):
+                        feat = None
 
-            # Usa el método centralizado del modelo (evita duplicar la lógica de batching)
+            # Usa el método centralizado del modelo
             logits = modelo.score_todos_los_productos(
                 customer_idx=c,
                 device=device,
                 features_cliente=feat,
                 batch_size=batch_size_scoring,
-            ).numpy()  # (n_productos,)
+            )
+            if not isinstance(logits, torch.Tensor):
+                logits = torch.from_numpy(logits)
 
             # Mask excluidos
-            for ex in excluidos:
-                if 0 <= ex < n_productos:
-                    logits[ex] = -np.inf
+            ex_list = [ex for ex in excluidos if 0 <= ex < n_productos]
+            if ex_list:
+                logits[ex_list] = float("-inf")
 
-            ranking_modelo = list(np.argsort(-logits))
+            # Top-K del modelo optimizado con torch.topk (ultra rápido en C++/GPU)
+            max_k = max(k_valores)
+            ranking_modelo = torch.topk(logits, k=max_k).indices.tolist()
 
-            # Ranking baseline
-            ranking_pop_filtrado = [p for p in ranking_popular if p not in excluidos]
+            # Ranking baseline rápido (detener en max_k en vez de filtrar 32k)
+            ranking_pop_filtrado: list[int] = []
+            for p in ranking_popular:
+                if p not in excluidos:
+                    ranking_pop_filtrado.append(p)
+                    if len(ranking_pop_filtrado) == max_k:
+                        break
 
             for k in k_valores:
                 prec_m = _precision_at_k(rel, ranking_modelo, k)

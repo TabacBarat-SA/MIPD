@@ -1,0 +1,51 @@
+{
+  "n_clientes_con_test": 19391,
+  "n_clientes_excluidos_sin_test": 0,
+  "resultados": {
+    "todos": {
+      "precision_at_5": 0.0002,
+      "ndcg_at_5": 0.0006,
+      "n_clientes": 19391,
+      "baseline_precision_at_5": 0.0021,
+      "baseline_ndcg_at_5": 0.0058,
+      "precision_at_10": 0.0002,
+      "ndcg_at_10": 0.0007,
+      "baseline_precision_at_10": 0.0016,
+      "baseline_ndcg_at_10": 0.0077,
+      "precision_at_20": 0.0001,
+      "ndcg_at_20": 0.001,
+      "baseline_precision_at_20": 0.0014,
+      "baseline_ndcg_at_20": 0.0102
+    },
+    "vistos": {
+      "precision_at_5": 0.0016,
+      "ndcg_at_5": 0.004,
+      "n_clientes": 255,
+      "baseline_precision_at_5": 0.0024,
+      "baseline_ndcg_at_5": 0.0042,
+      "precision_at_10": 0.0008,
+      "ndcg_at_10": 0.004,
+      "baseline_precision_at_10": 0.0016,
+      "baseline_ndcg_at_10": 0.0055,
+      "precision_at_20": 0.0006,
+      "ndcg_at_20": 0.005,
+      "baseline_precision_at_20": 0.0012,
+      "baseline_ndcg_at_20": 0.007
+    },
+    "nuevos": {
+      "precision_at_5": 0.0002,
+      "ndcg_at_5": 0.0005,
+      "n_clientes": 19136,
+      "baseline_precision_at_5": 0.0021,
+      "baseline_ndcg_at_5": 0.0059,
+      "precision_at_10": 0.0002,
+      "ndcg_at_10": 0.0007,
+      "baseline_precision_at_10": 0.0016,
+      "baseline_ndcg_at_10": 0.0077,
+      "precision_at_20": 0.0001,
+      "ndcg_at_20": 0.0009,
+      "baseline_precision_at_20": 0.0014,
+      "baseline_ndcg_at_20": 0.0103
+    }
+  }
+}

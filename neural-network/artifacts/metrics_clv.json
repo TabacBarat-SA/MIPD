@@ -1,0 +1,45 @@
+{
+  "n_clientes_test": 62298,
+  "n_clientes_clv_positivo": 425,
+  "pct_clv_cero": 99.32,
+  "modelo_log_todos": {
+    "mae": 0.0481,
+    "rmse": 0.4541,
+    "spearman": -0.0054
+  },
+  "modelo_log_clv_positivo": {
+    "mae": 4.6973,
+    "rmse": 4.7813,
+    "spearman": 0.0148
+  },
+  "modelo_original_todos": {
+    "mae": 1.2916,
+    "rmse": 18.872,
+    "spearman": -0.0054
+  },
+  "modelo_original_clv_positivo": {
+    "mae": 156.5326,
+    "rmse": 219.5663,
+    "spearman": 0.0148
+  },
+  "baseline_media_log": {
+    "mae": 0.075,
+    "rmse": 0.3973,
+    "spearman": NaN
+  },
+  "baseline_media_original": {
+    "mae": 1.1165,
+    "rmse": 18.166,
+    "spearman": NaN
+  },
+  "baseline_gasto_historico_log": {
+    "mae": 4.6922,
+    "rmse": 4.7718,
+    "spearman": 0.0027
+  },
+  "baseline_gasto_historico_original": {
+    "mae": 162.3369,
+    "rmse": 273.7665,
+    "spearman": 0.0027
+  }
+}

@@ -99,8 +99,7 @@ def validar_rangos_idx(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> N
                 f"[0, {n_clientes}): rango encontrado [{min_c}, {max_c}]"
             )
 
-    print(f"[validar_rangos] ✓ Todos los índices dentro de rango "
-          f"(clientes=[0,{n_clientes}), productos=[0,{n_productos}))")
+    # silent: índices válidos
 
 
 def verificar_anti_fuga(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> None:
@@ -125,16 +124,11 @@ def verificar_anti_fuga(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> 
                 f"FUGA DETECTADA: max fecha train ({max_train}) >= min fecha val ({min_val})",
                 stacklevel=2,
             )
-        else:
-            print(f"[anti-fuga] ✓ train({max_train}) < val({min_val})")
-
         if not ok_2:
             warnings.warn(
                 f"FUGA DETECTADA: max fecha val ({max_val}) >= min fecha test ({min_test})",
                 stacklevel=2,
             )
-        else:
-            print(f"[anti-fuga] ✓ val({max_val}) < test({min_test})")
     except KeyError as e:
         warnings.warn(f"No se pudo verificar anti-fuga: {e}", stacklevel=2)
 
@@ -204,13 +198,7 @@ def calcular_estadisticas_coldstart(
         stats[f"productos_{split}_nuevos"] = p_nuevos
         stats[f"productos_{split}_vistos"] = p_split & train_p
 
-        n_c = len(c_split)
-        n_p = len(p_split)
-        print(
-            f"[cold-start] {split}: "
-            f"{len(c_nuevos)}/{n_c} clientes nuevos ({100*len(c_nuevos)/max(n_c,1):.1f}%), "
-            f"{len(p_nuevos)}/{n_p} productos nuevos ({100*len(p_nuevos)/max(n_p,1):.1f}%)"
-        )
+        # (stats internas, no se imprime)
 
     return stats
 
@@ -225,9 +213,7 @@ def calcular_estadisticas_clv(
 
     for split in ("train", "val", "test"):
         clv = datos[f"clientes_{split}"][col_clv]
-        pct_cero = (clv == 0).mean() * 100
-        stats[f"pct_clv_cero_{split}"] = round(pct_cero, 2)
-        print(f"[clv] {split}: {pct_cero:.1f}% de clientes con CLV=0")
+        stats[f"pct_clv_cero_{split}"] = round((clv == 0).mean() * 100, 2)
 
     return stats
 

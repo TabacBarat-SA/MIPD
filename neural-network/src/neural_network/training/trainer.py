@@ -40,7 +40,7 @@ from torch.utils.data import DataLoader
 
 from neural_network.data.dataset import InteractionDataset
 from neural_network.models.multitask_net import MultiTaskNet
-from neural_network.training.early_stopping import EarlyStopping
+from neural_network.training.early_stopping import EarlyStopping, ModelCheckpoint
 
 
 def _fijar_semillas(semilla: int) -> None:
@@ -49,8 +49,10 @@ def _fijar_semillas(semilla: int) -> None:
     torch.cuda.manual_seed_all(semilla)
     np.random.seed(semilla)
     random.seed(semilla)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # benchmark=True deja que cuDNN elija los kernels más rápidos para los
+    # tamaños de entrada fijos de este modelo (gran ganancia en GPU).
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = False
 
 
 def calcular_stats_normalizacion(
@@ -118,21 +120,26 @@ def construir_features_map(
     arr = clientes_df[names].to_numpy(dtype=np.float32)
 
     if mean is None or std is None:
-        # Fallback: normalización local (solo para construcción interna del train map)
         mean = arr.mean(axis=0, keepdims=True)
         std  = arr.std(axis=0, keepdims=True) + 1e-8
 
     arr = (arr - mean) / std
 
-    feats_map: dict[int, torch.Tensor] = {}
-    for i, c_idx in enumerate(clientes_df[col_c].tolist()):
-        feats_map[int(c_idx)] = torch.tensor(arr[i], dtype=torch.float32)
+    # Devuelve un tensor denso shape (n_clientes_max+1, n_features) indexable
+    # directamente con customer_idx en GPU, evitando el dict lookup por batch.
+    idxs = clientes_df[col_c].to_numpy(dtype=np.int64)
+    n_max = int(idxs.max()) + 1
+    n_feat = arr.shape[1]
+    tabla = np.zeros((n_max, n_feat), dtype=np.float32)
+    tabla[idxs] = arr
+    return torch.from_numpy(tabla)  # shape (n_max, n_feat)
 
-    return feats_map
 
-
-# Alias privado para compatibilidad con pipeline.py (que importa el nombre anterior)
+# Alias privado para compatibilidad con pipeline.py
 _construir_features_map = construir_features_map
+
+# Tipo del mapa de features (ahora es un Tensor, antes era dict)
+FeaturesMap = torch.Tensor | None
 
 
 def _calcular_perdida_batch(
@@ -142,7 +149,7 @@ def _calcular_perdida_batch(
     criterio_rec: nn.Module,
     lambda_rec: float,
     device: torch.device,
-    features_map: dict[int, torch.Tensor] | None,
+    features_tabla: torch.Tensor | None,  # shape (n_clientes_max, n_features)
     n_features: int,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calcula la pérdida combinada para un batch.
@@ -151,11 +158,10 @@ def _calcular_perdida_batch(
     """
     c_idx, p_idx, etiqueta, clv_target = [t.to(device) for t in batch]
 
-    # Construir features_cliente si procede
+    # Lookup vectorizado en GPU: features_tabla[c_idx] en una sola operación
     feats = None
-    if features_map is not None and n_features > 0:
-        rows = [features_map.get(ci, torch.zeros(n_features)) for ci in c_idx.cpu().tolist()]
-        feats = torch.stack(rows).to(device)
+    if features_tabla is not None and n_features > 0:
+        feats = features_tabla.to(device)[c_idx]  # (batch, n_features)
 
     clv_pred, rec_logit = modelo(c_idx, p_idx, feats)
 
@@ -193,7 +199,7 @@ class Trainer:
     ) -> None:
         self.cfg = cfg
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"[trainer] Dispositivo: {self.device}")
+        print(f"  device={self.device}")
 
         # Semilla
         _fijar_semillas(cfg["entrenamiento"]["semilla"])
@@ -216,20 +222,24 @@ class Trainer:
             clientes_val_df, cfg, self.features_mean, self.features_std
         ) if clientes_val_df is not None else None
 
-        # ── DataLoaders ───────────────────────────────────────────────── #
+        # DataLoaders con workers para carga as\u00edncrona
+        n_workers = 2
         e = cfg["entrenamiento"]
         self.loader_train = DataLoader(
             dataset_train,
             batch_size=e["batch_size"],
             shuffle=True,
-            num_workers=0,
+            num_workers=n_workers,
             pin_memory=(self.device.type == "cuda"),
+            persistent_workers=(n_workers > 0),
         )
         self.loader_val = DataLoader(
             dataset_val,
             batch_size=e["batch_size"] * 2,
             shuffle=False,
-            num_workers=0,
+            num_workers=n_workers,
+            pin_memory=(self.device.type == "cuda"),
+            persistent_workers=(n_workers > 0),
         )
 
         # ── Optimizador ───────────────────────────────────────────────── #
@@ -245,17 +255,27 @@ class Trainer:
         self.lambda_rec: float = float(e["lambda_rec"])
         self.grad_clip: float = float(e["grad_clip"])
 
-        # ── Early stopping ────────────────────────────────────────────── #
-        es_cfg = cfg["early_stopping"]
-        self.early_stopping = EarlyStopping(
-            patience=es_cfg["patience"],
-            min_delta=es_cfg["min_delta"],
-        )
-
         # ── Rutas de artefactos ───────────────────────────────────────── #
         self.ruta_checkpoint: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["model_checkpoint"]
         self.ruta_curvas_csv: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["curvas_csv"]
         self.ruta_curvas_png: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["curvas_png"]
+
+        # ── Callbacks: EarlyStopping y ModelCheckpoint (val_loss, mode='min') ── #
+        es_cfg = cfg["early_stopping"]
+        self.early_stopping = EarlyStopping(
+            monitor="val_loss",
+            mode="min",
+            patience=es_cfg["patience"],
+            min_delta=es_cfg["min_delta"],
+            restore_best_weights=True,
+        )
+        self.checkpoint = ModelCheckpoint(
+            filepath=self.ruta_checkpoint,
+            monitor="val_loss",
+            mode="min",
+            save_best_only=True,
+            verbose=True,
+        )
 
         # Historial de curvas
         self.historial: list[dict[str, float]] = []
@@ -273,7 +293,7 @@ class Trainer:
             Resumen con mejor época, mejor val_loss y ruta del checkpoint.
         """
         n_epocas = self.cfg["entrenamiento"]["n_epocas"]
-        print(f"[trainer] Entrenando {n_epocas} épocas máx. con patience={self.early_stopping.patience}")
+        print(f"  {n_epocas} épocas máx.  patience={self.early_stopping.patience}")
 
         for epoca in range(1, n_epocas + 1):
             t0 = time.time()
@@ -299,28 +319,42 @@ class Trainer:
             })
 
             print(
-                f"[E{epoca:03d}] {elapsed:.1f}s | "
-                f"train: {train_loss:.4f} (clv={train_clv:.4f} rec={train_rec:.4f}) | "
-                f"val: {val_loss:.4f} (clv={val_clv:.4f} rec={val_rec:.4f})"
+                f"  E{epoca:03d} {elapsed:.1f}s | "
+                f"train {train_loss:.4f} (clv={train_clv:.4f} rec={train_rec:.4f}) | "
+                f"val {val_loss:.4f} (clv={val_clv:.4f} rec={val_rec:.4f})"
             )
 
-            # ── Early stopping ────────────────────────────────────────────── #
-            if self.early_stopping.paso(val_loss, self.modelo, epoca):
+            # ── ModelCheckpoint (guarda si val_loss mejora en modo min) ── #
+            self.checkpoint.paso(
+                valor=val_loss,
+                modelo=self.modelo,
+                epoca=epoca,
+                extra_datos={
+                    "config": self.cfg,
+                    "features_mean": self.features_mean,
+                    "features_std": self.features_std,
+                },
+            )
+
+            # ── EarlyStopping (detiene si val_loss no mejora en modo min) ─ #
+            if self.early_stopping.paso(valor=val_loss, modelo=self.modelo, epoca=epoca):
                 print(
-                    f"[early stopping] Detenido en época {epoca}. "
-                    f"Mejor: época {self.early_stopping.mejor_epoca} "
-                    f"(val_loss={self.early_stopping.mejor_loss:.4f})"
+                    f"  [early-stop] época {epoca}  "
+                    f"mejor=época {self.early_stopping.mejor_epoca} "
+                    f"val_loss={self.early_stopping.mejor_loss:.4f}"
                 )
                 break
 
-        # Restaurar mejores pesos y guardar checkpoint
+        # Restaurar mejores pesos del modelo y guardar curvas
         self.early_stopping.restaurar_mejor(self.modelo)
-        self._guardar_checkpoint()
         self._guardar_curvas()
 
+        mejor_epoca = self.checkpoint.mejor_epoca or self.early_stopping.mejor_epoca
+        mejor_val_loss = self.checkpoint.mejor_score if self.checkpoint.mejor_score != float("inf") else self.early_stopping.mejor_loss
+
         return {
-            "mejor_epoca": self.early_stopping.mejor_epoca,
-            "mejor_val_loss": self.early_stopping.mejor_loss,
+            "mejor_epoca": mejor_epoca,
+            "mejor_val_loss": mejor_val_loss,
             "checkpoint": str(self.ruta_checkpoint),
         }
 
@@ -395,33 +429,72 @@ class Trainer:
             "features_mean": self.features_mean,
             "features_std": self.features_std,
         }, self.ruta_checkpoint)
-        print(f"[trainer] Checkpoint guardado: {self.ruta_checkpoint}")
+        print(f"  checkpoint -> {self.ruta_checkpoint}")
 
     def _guardar_curvas(self) -> None:
         """Guarda historial de curvas en CSV y PNG."""
-        if self.historial:
-            keys = list(self.historial[0].keys())
-            with self.ruta_curvas_csv.open("w", newline="", encoding="utf-8") as f:
-                w = csv.DictWriter(f, fieldnames=keys)
-                w.writeheader()
-                w.writerows(self.historial)
+        if not self.historial:
+            return
 
-            # PNG
-            epocas = [h["epoca"] for h in self.historial]
-            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
-            for ax, (llave_train, llave_val, titulo) in zip(axes, [
-                ("train_loss", "val_loss", "Loss total"),
-                ("train_clv", "val_clv", "Loss CLV (Huber)"),
-                ("train_rec", "val_rec", "Loss Rec (BCE)"),
-            ]):
-                ax.plot(epocas, [h[llave_train] for h in self.historial], label="train")
-                ax.plot(epocas, [h[llave_val] for h in self.historial], label="val")
-                ax.set_title(titulo)
-                ax.set_xlabel("Época")
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-            fig.suptitle("Curvas de entrenamiento – MultiTaskNet")
+        keys = list(self.historial[0].keys())
+        with self.ruta_curvas_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=keys)
+            w.writeheader()
+            w.writerows(self.historial)
+
+        # ─── PNG con estilo moderno ──────────────────────────────────────────── #
+        epocas = [h["epoca"] for h in self.historial]
+        mejor_e = self.early_stopping.mejor_epoca
+        mejor_v = self.early_stopping.mejor_loss
+
+        metricas = [
+            ("train_loss", "val_loss",  "Loss total",      "#4C9BE8", "#FF6B6B"),
+            ("train_clv",  "val_clv",   "Loss CLV (Huber)", "#52D68A", "#FFB347"),
+            ("train_rec",  "val_rec",   "Loss Rec (BCE)",   "#BB8FCE", "#F9CA24"),
+        ]
+
+        with plt.style.context("dark_background"):
+            fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
+            fig.patch.set_facecolor("#1A1A2E")
+
+            for ax, (lk_tr, lk_val, titulo, c_tr, c_val) in zip(axes, metricas):
+                ax.set_facecolor("#16213E")
+                tr_vals = [h[lk_tr] for h in self.historial]
+                vl_vals = [h[lk_val] for h in self.historial]
+
+                ax.plot(epocas, tr_vals, color=c_tr, linewidth=2,
+                        label="train", alpha=0.9)
+                ax.plot(epocas, vl_vals, color=c_val, linewidth=2,
+                        label="val", alpha=0.9)
+
+                # Marca la mejor época con línea vertical y anotación
+                if mejor_e in epocas:
+                    ax.axvline(x=mejor_e, color="white", linewidth=1,
+                               linestyle="--", alpha=0.5)
+                    best_val = vl_vals[epocas.index(mejor_e)]
+                    ax.annotate(
+                        f"  ép.{mejor_e}\n  {best_val:.4f}",
+                        xy=(mejor_e, best_val),
+                        color="white", fontsize=7, alpha=0.85,
+                    )
+
+                ax.set_title(titulo, fontsize=11, fontweight="bold",
+                             color="white", pad=8)
+                ax.set_xlabel("Época", fontsize=9, color="#AAAAAA")
+                ax.tick_params(colors="#AAAAAA", labelsize=8)
+                for spine in ax.spines.values():
+                    spine.set_edgecolor("#333355")
+                ax.grid(True, alpha=0.15, linestyle=":")
+                ax.legend(fontsize=8, framealpha=0.3)
+
+            fig.suptitle(
+                f"Curvas de entrenamiento – MultiTaskNet"
+                f"   |   mejor época {mejor_e}  val_loss={mejor_v:.4f}",
+                fontsize=12, color="white", fontweight="bold", y=1.02,
+            )
             fig.tight_layout()
-            fig.savefig(self.ruta_curvas_png, dpi=120)
+            fig.savefig(self.ruta_curvas_png, dpi=130,
+                        bbox_inches="tight", facecolor=fig.get_facecolor())
             plt.close(fig)
-            print(f"[trainer] Curvas guardadas: {self.ruta_curvas_csv}, {self.ruta_curvas_png}")
+
+        print(f"  curvas -> {self.ruta_curvas_png}")

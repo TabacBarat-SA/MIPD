@@ -38,8 +38,8 @@ def exportar_embeddings(
     product_emb = modelo.get_product_embeddings().numpy()
     np.save(ruta_customer_emb, customer_emb)
     np.save(ruta_product_emb, product_emb)
-    print(f"[export] customer_embeddings.npy: {customer_emb.shape} → {ruta_customer_emb}")
-    print(f"[export] product_embeddings.npy:  {product_emb.shape} → {ruta_product_emb}")
+    print(f"[export] customer_embeddings.npy: {customer_emb.shape} -> {ruta_customer_emb}")
+    print(f"[export] product_embeddings.npy:  {product_emb.shape} -> {ruta_product_emb}")
     return customer_emb, product_emb
 
 
@@ -75,7 +75,7 @@ def exportar_predicciones_clv(
                 round(float(clv_orig_real[i]), 4),
                 round(float(clv_orig_pred[i]), 4),
             ])
-    print(f"[export] predictions_clv.csv ({len(c_idxs)} filas) → {ruta_salida}")
+    print(f"[export] predictions_clv.csv ({len(c_idxs)} filas) -> {ruta_salida}")
 
 
 def exportar_predicciones_rec(
@@ -112,7 +112,15 @@ def exportar_predicciones_rec(
 
                 feat = None
                 if features_map is not None:
-                    feat = features_map.get(int(c))  # shape (n_features,) o None
+                    if isinstance(features_map, dict):
+                        feat = features_map.get(int(c))
+                    elif isinstance(features_map, torch.Tensor):
+                        feat = features_map[int(c)] if 0 <= int(c) < len(features_map) else None
+                    elif hasattr(features_map, "__getitem__"):
+                        try:
+                            feat = features_map[int(c)]
+                        except (IndexError, KeyError):
+                            feat = None
 
                 # Usa el método centralizado del modelo
                 logits = modelo.score_todos_los_productos(
@@ -120,20 +128,21 @@ def exportar_predicciones_rec(
                     device=device,
                     features_cliente=feat,
                     batch_size=batch_size_scoring,
-                ).numpy()
+                )
+                if not isinstance(logits, torch.Tensor):
+                    logits = torch.from_numpy(logits)
 
-                for ex in excluidos:
-                    if 0 <= ex < n_productos:
-                        logits[ex] = -np.inf
+                ex_list = [ex for ex in excluidos if 0 <= ex < n_productos]
+                if ex_list:
+                    logits[ex_list] = float("-inf")
 
-                top_idx = np.argsort(-logits)[:k_max]
-                for rank, p_idx in enumerate(top_idx, start=1):
-                    score = float(logits[p_idx])
+                top_scores, top_idx = torch.topk(logits, k=k_max)
+                for rank, (score, p_idx) in enumerate(zip(top_scores.tolist(), top_idx.tolist()), start=1):
                     if not np.isfinite(score):
                         break
-                    w.writerow([int(c), int(p_idx), round(score, 6), rank])
+                    w.writerow([int(c), int(p_idx), round(float(score), 6), rank])
 
-    print(f"[export] predictions_rec.csv ({len(clientes_test_list)} clientes, top-{k_max}) → {ruta_salida}")
+    print(f"[export] predictions_rec.csv ({len(clientes_test_list)} clientes, top-{k_max}) -> {ruta_salida}")
 
 
 def exportar_mapeos(
@@ -141,26 +150,58 @@ def exportar_mapeos(
     productos: Any,            # pd.DataFrame
     cfg: dict[str, Any],
     artifacts_dir: Path,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
-    """Guarda customer_idx_to_id.json y product_idx_to_id.json."""
+    """Guarda customer_idx_to_id.json y product_idx_to_id.json.
+
+    Asegura que customer_idx_to_id.json incluya los 93.357 clientes únicos de Olist
+    (customer_unique_id) indexados del 0 al 93.356, para que coincida exactamente
+    1:1 con las filas de customer_embeddings.npy.
+    """
     import json
+    import warnings
 
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
 
-    # customer_idx → customer_unique_id (vectorizado, sin iterrows)
-    if "customer_unique_id" in interacciones_train.columns:
-        df_c = interacciones_train[[col_c, "customer_unique_id"]].drop_duplicates()
-        c_map = dict(zip(df_c[col_c].astype(int).astype(str), df_c["customer_unique_id"]))
+    # 1) customer_idx → customer_unique_id
+    c_map: dict[str, str] | None = None
+
+    # Intentar primero cargar desde metadata.json (fuente oficial completa: 93.357 clientes)
+    if metadata is not None and "mapas" in metadata and "clientes" in metadata["mapas"]:
+        c_map = {str(idx): str(cid) for cid, idx in metadata["mapas"]["clientes"].items()}
     else:
-        c_idxs = interacciones_train[col_c].unique()
-        c_map = {str(int(ci)): str(int(ci)) for ci in c_idxs}
+        ruta_meta = cfg.get("datos", {}).get("_metadata_abs")
+        if ruta_meta and Path(ruta_meta).exists():
+            try:
+                with Path(ruta_meta).open("r", encoding="utf-8") as f:
+                    meta_cargado = json.load(f)
+                clientes_map = meta_cargado.get("mapas", {}).get("clientes", {})
+                if clientes_map:
+                    c_map = {str(idx): str(cid) for cid, idx in clientes_map.items()}
+            except Exception as e:
+                warnings.warn(f"No se pudo cargar mapeo de clientes desde {ruta_meta}: {e}", stacklevel=2)
 
-    # product_idx → product_id (vectorizado, sin iterrows)
-    p_map = dict(zip(productos[col_p].astype(int).astype(str), productos["product_id"]))
+    # Fallback si no hay metadata: usar DataFrame de interacciones
+    if c_map is None:
+        if "customer_unique_id" in interacciones_train.columns:
+            df_c = interacciones_train[[col_c, "customer_unique_id"]].drop_duplicates()
+            c_map = dict(zip(df_c[col_c].astype(int).astype(str), df_c["customer_unique_id"]))
+        else:
+            c_idxs = interacciones_train[col_c].unique()
+            c_map = {str(int(ci)): str(int(ci)) for ci in c_idxs}
 
+    # 2) product_idx → product_id
+    p_map: dict[str, str] | None = None
+    if metadata is not None and "mapas" in metadata and "productos" in metadata["mapas"]:
+        p_map = {str(idx): str(pid) for pid, idx in metadata["mapas"]["productos"].items()}
+    elif productos is not None and "product_id" in productos.columns and col_p in productos.columns:
+        p_map = dict(zip(productos[col_p].astype(int).astype(str), productos["product_id"]))
+
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     for nombre, mapa in [("customer_idx_to_id.json", c_map), ("product_idx_to_id.json", p_map)]:
-        ruta = artifacts_dir / nombre
-        with ruta.open("w", encoding="utf-8") as f:
-            json.dump(mapa, f, ensure_ascii=False)
-        print(f"[export] {nombre} ({len(mapa)} entradas) → {ruta}")
+        if mapa is not None:
+            ruta = artifacts_dir / nombre
+            with ruta.open("w", encoding="utf-8") as f:
+                json.dump(mapa, f, ensure_ascii=False)
+            print(f"[export] {nombre} ({len(mapa)} entradas) -> {ruta}")

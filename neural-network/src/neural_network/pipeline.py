@@ -22,20 +22,16 @@ from typing import Any
 import numpy as np
 import torch
 
+def run_pipeline(
+    config_path: Path | None = None,
+    max_epochs: int | None = None,
+    patience: int | None = None,
+    min_delta: float | None = None,
+    batch_size: int | None = None,
+    lr: float | None = None,
+) -> dict[str, Any]:
+    """Ejecuta el pipeline completo de entrenamiento y evaluación."""
 
-def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
-    """Ejecuta el pipeline completo de entrenamiento y evaluación.
-
-    Parámetros
-    ----------
-    config_path : Path | None
-        Ruta al config.yaml. Si None, usa el valor por defecto del módulo.
-
-    Devuelve
-    -------
-    dict
-        Resumen con rutas de artefactos generados y métricas finales.
-    """
     from neural_network.config import cargar_config, get_artifact_path
     from neural_network.data.preprocessing import (
         cargar_todo,
@@ -55,37 +51,39 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         exportar_mapeos,
     )
 
-    print("=" * 60)
-    print("  PIPELINE – MultiTaskNet (CLV + Recomendación)")
-    print("=" * 60)
+    print("\n━━━  MultiTaskNet Pipeline (CLV + Recomendación)  ━━━")
 
-    # ─── BLOQUE 0: Carga y verificación ─────────────────────────────── #
-    print("\n[BLOQUE 0] Carga de datos y verificaciones...")
+    # ─── BLOQUE 0: Carga ─────────────────────────────────────────────── #
+    print("[0/5] Cargando datos...")
     cfg = cargar_config(config_path)
-    datos, stats_cs, stats_clv = cargar_todo(cfg)
+
+    # Aplicar overrides si se especificaron
+    if max_epochs is not None:
+        cfg["entrenamiento"]["n_epocas"] = max_epochs
+    if patience is not None:
+        cfg["early_stopping"]["patience"] = patience
+    if min_delta is not None:
+        cfg["early_stopping"]["min_delta"] = min_delta
+    if batch_size is not None:
+        cfg["entrenamiento"]["batch_size"] = batch_size
+    if lr is not None:
+        cfg["entrenamiento"]["lr"] = lr
+
+    datos, stats_cs, _stats_clv = cargar_todo(cfg)
 
     n_productos = cfg["modelo"]["n_productos"]
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
 
-    # Positivos por cliente en cada split (función canónica de preprocessing)
     pos_train = construir_positivos_por_cliente(datos["interacciones_train"], col_c, col_p)
     pos_val   = construir_positivos_por_cliente(datos["interacciones_val"],   col_c, col_p)
     pos_test  = construir_positivos_por_cliente(datos["interacciones_test"],  col_c, col_p)
-
-    # Popularidad para muestreo sesgado (solo train)
-    popularidad = calcular_popularidad_productos(
-        datos["interacciones_train"], n_productos, cfg
-    )
-
-    # ── Stats de normalización (calculadas SOLO en train) ─────────────── #
-    # Se usan para normalizar train, val y test de forma consistente (sin leakage).
+    popularidad = calcular_popularidad_productos(datos["interacciones_train"], n_productos, cfg)
     features_mean, features_std = calcular_stats_features_train(datos["clientes_train"], cfg)
 
     # ─── BLOQUE 1: Datasets ──────────────────────────────────────────── #
-    print("\n[BLOQUE 1] Construcción de datasets...")
+    print("[1/5] Construyendo datasets...")
     semilla_val = cfg["evaluacion"]["semilla_negativos_val"]
-
     ds_train = construir_dataset(
         interacciones=datos["interacciones_train"],
         clientes=datos["clientes_train"],
@@ -93,7 +91,7 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         n_productos=n_productos,
         cfg=cfg,
         popularidad=popularidad,
-        semilla=None,   # negativos dinámicos en train
+        semilla=None,
     )
     ds_val = construir_dataset(
         interacciones=datos["interacciones_val"],
@@ -104,16 +102,16 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         popularidad=popularidad,
         semilla=semilla_val,
     )
-    print(f"  train: {len(ds_train)} muestras | val: {len(ds_val)} muestras")
+    print(f"    train={len(ds_train):,} muestras  |  val={len(ds_val):,} muestras")
 
     # ─── BLOQUE 2: Modelo ────────────────────────────────────────────── #
-    print("\n[BLOQUE 2] Construcción del modelo MultiTaskNet...")
+    print("[2/5] Construyendo modelo MultiTaskNet...")
     modelo = MultiTaskNet.desde_config(cfg)
     n_params = sum(p.numel() for p in modelo.parameters() if p.requires_grad)
-    print(f"  Parámetros entrenables: {n_params:,}")
+    print(f"    {n_params:,} parámetros entrenables")
 
     # ─── BLOQUE 3: Entrenamiento ─────────────────────────────────────── #
-    print("\n[BLOQUE 3] Entrenamiento con early stopping...")
+    print("[3/5] Entrenando...")
     trainer = Trainer(
         modelo=modelo,
         dataset_train=ds_train,
@@ -123,11 +121,11 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         clientes_val_df=datos["clientes_val"],
     )
     resultado_entrenamiento = trainer.entrenar()
-    print(f"  Mejor época: {resultado_entrenamiento['mejor_epoca']} "
-          f"(val_loss={resultado_entrenamiento['mejor_val_loss']:.4f})")
+    print(f"    -> mejor epoca {resultado_entrenamiento['mejor_epoca']}  "
+          f"val_loss={resultado_entrenamiento['mejor_val_loss']:.4f}")
 
     # ─── BLOQUE 4: Evaluación CLV ────────────────────────────────────── #
-    print("\n[BLOQUE 4] Evaluación de CLV sobre test...")
+    print("[4/5] Evaluando CLV sobre test...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     modelo.eval().to(device)
 
@@ -136,13 +134,9 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
 
     clv_log_test = datos["clientes_test"][col_clv_log].to_numpy(dtype=np.float64)
     c_test_idxs = datos["clientes_test"][col_c_cliente].to_numpy(dtype=np.int64)
-
-    # Mapa de features de test con stats de train (sin data leakage)
     features_test_map = construir_features_map(
         datos["clientes_test"], cfg, features_mean, features_std
     )
-
-    # Inferencia CLV usando predict_clv() (sin producto ficticio)
     clv_log_pred = _inferir_clv(modelo, c_test_idxs, features_test_map, cfg, device)
 
     metricas_clv = evaluar_clv(
@@ -156,8 +150,7 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
     )
 
     # ─── BLOQUE 5: Evaluación Recomendación + Exportación ────────────── #
-    print("\n[BLOQUE 5] Evaluación de recomendación...")
-    # Mapa de features de train con stats de train para inferencia de recomendación
+    print("[5/5] Evaluando recomendación y exportando...")
     features_train_map = construir_features_map(
         datos["clientes_train"], cfg, features_mean, features_std
     )
@@ -175,25 +168,20 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         ruta_salida=get_artifact_path(cfg, "metrics_rec_json"),
     )
 
-    print("\n[BLOQUE 5] Exportando predicciones y embeddings...")
     artifacts_dir: Path = cfg["_artifacts_dir_abs"]
-
     exportar_embeddings(
         modelo=modelo,
         ruta_customer_emb=get_artifact_path(cfg, "customer_embeddings_npy"),
         ruta_product_emb=get_artifact_path(cfg, "product_embeddings_npy"),
     )
-
     exportar_predicciones_clv(
         clientes_test=datos["clientes_test"],
         clv_log_pred=clv_log_pred,
         ruta_salida=get_artifact_path(cfg, "predictions_clv_csv"),
         cfg=cfg,
     )
-
     pos_excluidos = {c: pos_train.get(c, set()) | pos_val.get(c, set())
                      for c in set(pos_train) | set(pos_val)}
-
     exportar_predicciones_rec(
         modelo=modelo,
         interacciones_test=datos["interacciones_test"],
@@ -203,7 +191,6 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         k_max=max(cfg["evaluacion"]["k_valores"]),
         features_map=features_train_map,
     )
-
     exportar_mapeos(
         interacciones_train=datos["interacciones_train"],
         productos=datos["productos"],
@@ -211,10 +198,7 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
         artifacts_dir=artifacts_dir,
     )
 
-    print("\n" + "=" * 60)
-    print("  PIPELINE COMPLETADO")
-    print(f"  Artifacts en: {artifacts_dir}")
-    print("=" * 60)
+    print(f"\n[OK] Pipeline completado -> artifacts: {artifacts_dir}")
 
     return {
         "entrenamiento": resultado_entrenamiento,
@@ -230,30 +214,11 @@ def run_pipeline(config_path: Path | None = None) -> dict[str, Any]:
 def _inferir_clv(
     modelo: "MultiTaskNet",
     c_idxs: np.ndarray,
-    features_map: dict[int, torch.Tensor] | None,
+    features_tabla: torch.Tensor | None,
     cfg: dict,
     device: torch.device,
 ) -> np.ndarray:
-    """Infiere clv_log para todos los clientes usando ``predict_clv()`` (sin producto ficticio).
-
-    Parámetros
-    ----------
-    modelo : MultiTaskNet
-        Modelo entrenado en modo eval.
-    c_idxs : np.ndarray
-        Índices de clientes sobre los que inferir.
-    features_map : dict | None
-        Mapa {customer_idx → tensor de features} normalizado con stats de train.
-    cfg : dict
-        Configuración.
-    device : torch.device
-        Dispositivo de cómputo.
-
-    Devuelve
-    -------
-    np.ndarray shape (len(c_idxs),)
-        Predicciones de CLV en escala log1p.
-    """
+    """Infiere clv_log para todos los clientes usando ``predict_clv()``."""
     modelo.eval()
     batch_size = 512
     preds = []
@@ -264,11 +229,9 @@ def _inferir_clv(
         c_t = torch.tensor(batch_c, dtype=torch.long, device=device)
 
         feats = None
-        if features_map is not None and n_feat > 0:
-            rows = [features_map.get(int(c), torch.zeros(n_feat)) for c in batch_c]
-            feats = torch.stack(rows).to(device)
+        if features_tabla is not None and n_feat > 0:
+            feats = features_tabla.to(device)[c_t]  # lookup vectorizado en GPU
 
-        # predict_clv() no usa producto ficticio: es la forma correcta de inferir CLV
         clv_pred = modelo.predict_clv(c_t, feats)
         preds.append(clv_pred.cpu().numpy())
 

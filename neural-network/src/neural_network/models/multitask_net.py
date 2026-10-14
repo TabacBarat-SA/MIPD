@@ -307,25 +307,21 @@ class MultiTaskNet(nn.Module):
         if device is None:
             device = next(self.parameters()).device
 
-        n = self.n_productos
-        logits_list: list[torch.Tensor] = []
-
-        feat_batch = None
+        c_tensor = torch.tensor([customer_idx], dtype=torch.long, device=device)
+        feat_tensor = None
         if self.usar_features and features_cliente is not None:
-            feat_expandida = features_cliente.to(device)  # (n_features,)
+            feat_tensor = features_cliente.unsqueeze(0).to(device)
 
-        for i in range(0, n, batch_size):
-            p_batch = torch.arange(i, min(i + batch_size, n), dtype=torch.long, device=device)
-            bs = len(p_batch)
-            c_batch = torch.full((bs,), customer_idx, dtype=torch.long, device=device)
+        # 1 sola pasada por el tronco del cliente
+        rep_c = self._representacion_cliente(c_tensor, feat_tensor)  # (1, dim_tronco)
+        n = self.n_productos
+        emb_p = self.emb_producto.weight.to(device)                   # (n, dim_emb)
 
-            if self.usar_features and features_cliente is not None:
-                feat_batch = feat_expandida.unsqueeze(0).expand(bs, -1)
-
-            _, logit = self.forward(c_batch, p_batch, feat_batch)
-            logits_list.append(logit.cpu())
-
-        return torch.cat(logits_list)
+        # Puntuación vectorial completa en GPU
+        x = torch.cat([rep_c.expand(n, -1), emb_p], dim=-1)
+        rec_hidden = self.cabeza_rec(x)
+        logits = self.cabeza_rec_out(rec_hidden).squeeze(-1)  # (n,)
+        return logits.cpu()
 
     # Alias para compatibilidad hacia atrás
     score_all_products = score_todos_los_productos
