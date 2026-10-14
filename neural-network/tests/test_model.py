@@ -21,6 +21,7 @@ def modelo_pequeño():
         n_productos=15,
         dim_embedding=8,
         capas_tronco=[16, 8],
+        capas_rec=[8],
         dropout=0.0,   # sin dropout para reproducibilidad
         usar_layer_norm=True,
         usar_features=False,
@@ -36,6 +37,7 @@ def modelo_con_features():
         n_productos=15,
         dim_embedding=8,
         capas_tronco=[16, 8],
+        capas_rec=[8],
         dropout=0.0,
         usar_layer_norm=True,
         usar_features=True,
@@ -80,8 +82,25 @@ class TestMultiTaskNetShapes:
         assert emb.shape == (15, 8), f"Shape esperado (15, 8), obtenido {emb.shape}"
 
     def test_score_all_products_shape(self, modelo_pequeño):
-        scores = modelo_pequeño.score_all_products(customer_idx=0)
+        scores = modelo_pequeño.score_todos_los_productos(customer_idx=0)
         assert scores.shape == (15,), f"Shape esperado (15,), obtenido {scores.shape}"
+
+    def test_predict_clv_shape(self, modelo_pequeño):
+        """predict_clv debe devolver shape (B,) sin necesitar producto."""
+        c = torch.tensor([0, 1, 2])
+        clv = modelo_pequeño.predict_clv(c)
+        assert clv.shape == (3,), f"Shape esperado (3,), obtenido {clv.shape}"
+
+    def test_predict_clv_coincide_con_forward(self, modelo_pequeño):
+        """predict_clv debe dar el mismo resultado que forward para la cabeza CLV."""
+        c = torch.tensor([0, 1])
+        p = torch.tensor([0, 0])  # producto arbitrario
+        clv_forward, _ = modelo_pequeño(c, p)
+        clv_pred = modelo_pequeño.predict_clv(c)
+        # Deben ser idénticos (misma representación del cliente)
+        assert torch.allclose(clv_forward, clv_pred, atol=1e-6), (
+            f"predict_clv difiere de forward: {clv_pred} vs {clv_forward}"
+        )
 
     def test_embeddings_no_en_cuda(self, modelo_pequeño):
         """get_customer_embeddings debe devolver siempre tensor en CPU."""
@@ -149,6 +168,7 @@ class TestMultiTaskNetConfig:
                 "n_productos": 50,
                 "dim_embedding": 16,
                 "capas_tronco": [32, 16],
+                "capas_rec": [16],
                 "dropout": 0.1,
                 "usar_layer_norm": True,
                 "usar_features": False,
@@ -164,7 +184,7 @@ class TestMultiTaskNetConfig:
         """capas_tronco=[] debe funcionar (sin tronco compartido)."""
         modelo = MultiTaskNet(
             n_clientes=5, n_productos=10, dim_embedding=4,
-            capas_tronco=[], dropout=0.0, usar_layer_norm=False,
+            capas_tronco=[], capas_rec=[8], dropout=0.0, usar_layer_norm=False,
             usar_features=False,
         )
         c = torch.tensor([0, 1])

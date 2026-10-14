@@ -49,6 +49,7 @@ modelo:
   usar_features: true    # concatenar features numéricas al embedding
   n_features_cliente: 9  # longitud de features_cliente
   capas_tronco: [128, 64]  # MLP compartido (vacío = sin tronco compartido)
+  capas_rec: [64]          # capas del MLP de la cabeza de recomendación
   dropout: 0.3
   usar_layer_norm: true
 
@@ -63,6 +64,7 @@ entrenamiento:
   lambda_rec: 1.0          # peso de la pérdida de recomendación
   huber_delta: 1.0         # delta para HuberLoss en CLV
   k_negativos: 4           # negativos por cada positivo
+  lr_scheduler: null       # scheduler de LR: null | "plateau" | "cosine" (v2)
 
 # ─── Early stopping ───────────────────────────────────────────────────────────
 early_stopping:
@@ -71,8 +73,9 @@ early_stopping:
 
 # ─── Evaluación de recomendación ──────────────────────────────────────────────
 evaluacion:
-  k_valores: [5, 10, 20]  # Precision@K y NDCG@K para estos K
+  k_valores: [5, 10, 20]       # Precision@K y NDCG@K para estos K
   semilla_negativos_val: 123   # semilla fija para negativos de val/test
+  batch_size_scoring: 4096     # batch size al puntuar todos los productos por cliente
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 logging:

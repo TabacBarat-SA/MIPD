@@ -12,6 +12,9 @@ Decisiones documentadas:
   aleatoriamente (mismo proceso que el resto). Se reportan métricas separadas
   para "vistos" vs "nuevos" en val/test.
 - Anti-fuga: se verifica que max(fecha_train) < min(fecha_val) < min(fecha_test).
+- Normalización de features: las stats (media, std) se calculan SOLO sobre el
+  split de train y se devuelven junto con los DataFrames para aplicarlas de forma
+  consistente a val/test sin data leakage.
 """
 from __future__ import annotations
 
@@ -23,6 +26,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+
+# ─── Carga ────────────────────────────────────────────────────────────────── #
 
 def cargar_metadata(cfg: dict[str, Any]) -> dict[str, Any]:
     """Lee y devuelve el archivo ``metadata.json``."""
@@ -49,6 +54,53 @@ def cargar_parquets(cfg: dict[str, Any]) -> dict[str, pd.DataFrame]:
         ruta: Path = cfg["datos"][f"_{clave}_abs"]
         datos[clave] = pd.read_parquet(ruta)
     return datos
+
+
+# ─── Validación de integridad ─────────────────────────────────────────────── #
+
+def validar_rangos_idx(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> None:
+    """Verifica que customer_idx y product_idx estén dentro del rango del config.
+
+    Lanza ``ValueError`` si algún índice cae fuera del rango esperado, lo que
+    evitaría errores crípticos de CUDA al acceder a la tabla de embeddings.
+    """
+    n_clientes = cfg["modelo"]["n_clientes"]
+    n_productos = cfg["modelo"]["n_productos"]
+    col_c = cfg["columnas"]["interaccion_cliente_idx"]
+    col_p = cfg["columnas"]["interaccion_producto_idx"]
+
+    for split in ("train", "val", "test"):
+        df = datos[f"interacciones_{split}"]
+
+        max_c = int(df[col_c].max())
+        min_c = int(df[col_c].min())
+        if min_c < 0 or max_c >= n_clientes:
+            raise ValueError(
+                f"[validar_rangos] interacciones_{split}: customer_idx fuera de "
+                f"[0, {n_clientes}): rango encontrado [{min_c}, {max_c}]"
+            )
+
+        max_p = int(df[col_p].max())
+        min_p = int(df[col_p].min())
+        if min_p < 0 or max_p >= n_productos:
+            raise ValueError(
+                f"[validar_rangos] interacciones_{split}: product_idx fuera de "
+                f"[0, {n_productos}): rango encontrado [{min_p}, {max_p}]"
+            )
+
+    col_c_cli = cfg["columnas"]["cliente_idx"]
+    for split in ("train", "val", "test"):
+        df_c = datos[f"clientes_{split}"]
+        max_c = int(df_c[col_c_cli].max())
+        min_c = int(df_c[col_c_cli].min())
+        if min_c < 0 or max_c >= n_clientes:
+            raise ValueError(
+                f"[validar_rangos] clientes_{split}: customer_idx fuera de "
+                f"[0, {n_clientes}): rango encontrado [{min_c}, {max_c}]"
+            )
+
+    print(f"[validar_rangos] ✓ Todos los índices dentro de rango "
+          f"(clientes=[0,{n_clientes}), productos=[0,{n_productos}))")
 
 
 def verificar_anti_fuga(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> None:
@@ -86,6 +138,39 @@ def verificar_anti_fuga(datos: dict[str, pd.DataFrame], cfg: dict[str, Any]) -> 
     except KeyError as e:
         warnings.warn(f"No se pudo verificar anti-fuga: {e}", stacklevel=2)
 
+
+# ─── Construcción de estructuras de datos ─────────────────────────────────── #
+
+def construir_positivos_por_cliente(
+    df: pd.DataFrame,
+    col_cliente: str,
+    col_producto: str,
+) -> dict[int, set[int]]:
+    """Construye {customer_idx → set(product_idx)} desde un DataFrame.
+
+    Esta es la implementación canónica; el resto del módulo la importa desde aquí.
+
+    Parámetros
+    ----------
+    df : pd.DataFrame
+        DataFrame de interacciones.
+    col_cliente : str
+        Nombre de la columna de índice de cliente.
+    col_producto : str
+        Nombre de la columna de índice de producto.
+    """
+    pos: dict[int, set[int]] = {}
+    # groupby + agg es más rápido que iterar fila a fila con zip
+    for c, group in df.groupby(col_cliente)[col_producto]:
+        pos[int(c)] = set(group.astype(int).tolist())
+    return pos
+
+
+# Alias de compatibilidad hacia atrás (usado en algunas versiones antiguas del módulo)
+construir_positivos_por_cliente_desde_df = construir_positivos_por_cliente
+
+
+# ─── Estadísticas ─────────────────────────────────────────────────────────── #
 
 def calcular_estadisticas_coldstart(
     datos: dict[str, pd.DataFrame],
@@ -174,27 +259,37 @@ def calcular_popularidad_productos(
     return pop
 
 
-def construir_positivos_por_cliente_desde_df(
-    df: pd.DataFrame,
-    col_cliente: str,
-    col_producto: str,
-) -> dict[int, set[int]]:
-    """Construye {customer_idx → set(product_idx)} desde un DataFrame.
+def calcular_stats_features_train(
+    clientes_train: pd.DataFrame,
+    cfg: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+    """Calcula media y desviación estándar de las features en el split de train.
+
+    Estas stats deben aplicarse a val/test para evitar data leakage.
 
     Parámetros
     ----------
-    df : pd.DataFrame
-        DataFrame de interacciones.
-    col_cliente : str
-        Nombre de la columna de índice de cliente.
-    col_producto : str
-        Nombre de la columna de índice de producto.
-    """
-    pos: dict[int, set[int]] = {}
-    for c, p in zip(df[col_cliente].tolist(), df[col_producto].tolist()):
-        pos.setdefault(int(c), set()).add(int(p))
-    return pos
+    clientes_train : pd.DataFrame
+        DataFrame de clientes del split de entrenamiento.
+    cfg : dict
+        Configuración completa.
 
+    Devuelve
+    -------
+    (mean, std) : tupla de arrays shape (n_features,) o (None, None) si
+        ``usar_features=False``.
+    """
+    if not cfg["modelo"]["usar_features"]:
+        return None, None
+
+    names = cfg["columnas"]["features_cliente"]
+    arr = clientes_train[names].to_numpy(dtype=np.float32)
+    mean = arr.mean(axis=0)               # (n_features,)
+    std  = arr.std(axis=0) + 1e-8         # (n_features,)
+    return mean, std
+
+
+# ─── Carga completa ───────────────────────────────────────────────────────── #
 
 def cargar_todo(cfg: dict[str, Any]) -> tuple[dict[str, pd.DataFrame], dict[str, Any], dict[str, Any]]:
     """Función de conveniencia: carga parquets, verifica anti-fuga y calcula stats.
@@ -209,6 +304,7 @@ def cargar_todo(cfg: dict[str, Any]) -> tuple[dict[str, pd.DataFrame], dict[str,
         Estadísticas de CLV (% de ceros por split).
     """
     datos = cargar_parquets(cfg)
+    validar_rangos_idx(datos, cfg)
     verificar_anti_fuga(datos, cfg)
     stats_cs = calcular_estadisticas_coldstart(datos, cfg)
     stats_clv = calcular_estadisticas_clv(datos, cfg)

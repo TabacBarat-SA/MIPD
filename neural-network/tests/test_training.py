@@ -13,6 +13,7 @@ import torch
 
 from neural_network.training.early_stopping import EarlyStopping
 from neural_network.models.multitask_net import MultiTaskNet
+from neural_network.data.preprocessing import construir_positivos_por_cliente
 
 
 # ─── Tests de EarlyStopping ─────────────────────────────────────────────── #
@@ -121,8 +122,13 @@ class TestTrainer:
         }
 
     def test_loss_baja_en_mini_dataset(self, tmp_path):
-        """La loss de train debe bajar en un mini-dataset sintético."""
-        from neural_network.data.dataset import InteractionDataset, construir_positivos_por_cliente
+        """La loss de train debe bajar al sobreajustar un mini-dataset sintético.
+
+        Se usa un dataset pequeño sobreajustable, semilla fija y
+        muchas épocas sin early stopping para garantizar que la loss baja.
+        """
+        import pandas as pd
+        from neural_network.data.dataset import InteractionDataset
         from neural_network.training.trainer import Trainer
 
         rng = np.random.default_rng(42)
@@ -130,15 +136,21 @@ class TestTrainer:
         clientes = rng.integers(0, 10, n_pos).astype(np.int64)
         productos = rng.integers(0, 20, n_pos).astype(np.int64)
         clv = rng.uniform(0, 2, n_pos).astype(np.float32)
-        positivos = construir_positivos_por_cliente(clientes, productos)
+
+        df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+        positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
 
         ds_train = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=None)
-        ds_val = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=42)
+        ds_val   = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=42)
 
         cfg = self._cfg_minimo(tmp_path)
+        cfg["entrenamiento"]["n_epocas"] = 20   # suficientes épocas para bajar
+        cfg["early_stopping"]["patience"] = 30  # sin early stopping
+
         modelo = MultiTaskNet(
             n_clientes=10, n_productos=20, dim_embedding=8,
-            capas_tronco=[16], dropout=0.0, usar_layer_norm=False, usar_features=False,
+            capas_tronco=[16], capas_rec=[16], dropout=0.0,
+            usar_layer_norm=False, usar_features=False,
         )
         trainer = Trainer(
             modelo=modelo,
@@ -150,16 +162,19 @@ class TestTrainer:
         )
 
         resultado = trainer.entrenar()
-        # La loss debe haber bajado respecto a la primera época
         first_loss = trainer.historial[0]["train_loss"]
-        last_loss = trainer.historial[-1]["train_loss"]
-        # Verificar que al menos entrenó alguna época
-        assert len(trainer.historial) > 0
+        last_loss  = trainer.historial[-1]["train_loss"]
+
+        # El modelo DEBE sobreajustarse al mini-dataset en 20 épocas
+        assert last_loss < first_loss * 0.95, (
+            f"La loss no bajó suficiente: inicial={first_loss:.4f}, final={last_loss:.4f}"
+        )
         assert resultado["checkpoint"] is not None
 
     def test_early_stopping_guarda_checkpoint(self, tmp_path):
         """Tras el early stopping, el checkpoint debe existir en disco."""
-        from neural_network.data.dataset import InteractionDataset, construir_positivos_por_cliente
+        import pandas as pd
+        from neural_network.data.dataset import InteractionDataset
         from neural_network.training.trainer import Trainer
 
         rng = np.random.default_rng(0)
@@ -167,10 +182,11 @@ class TestTrainer:
         clientes = rng.integers(0, 10, n_pos).astype(np.int64)
         productos = rng.integers(0, 20, n_pos).astype(np.int64)
         clv = rng.uniform(0, 2, n_pos).astype(np.float32)
-        positivos = construir_positivos_por_cliente(clientes, productos)
+        df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+        positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
 
         ds_train = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=None)
-        ds_val = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=99)
+        ds_val   = InteractionDataset(clientes, productos, clv, positivos, 20, k=2, semilla=99)
 
         cfg = self._cfg_minimo(tmp_path)
         cfg["entrenamiento"]["n_epocas"] = 10
@@ -178,7 +194,8 @@ class TestTrainer:
 
         modelo = MultiTaskNet(
             n_clientes=10, n_productos=20, dim_embedding=8,
-            capas_tronco=[16], dropout=0.0, usar_layer_norm=False, usar_features=False,
+            capas_tronco=[16], capas_rec=[16], dropout=0.0,
+            usar_layer_norm=False, usar_features=False,
         )
         trainer = Trainer(
             modelo=modelo,
@@ -193,7 +210,8 @@ class TestTrainer:
 
     def test_trainer_genera_curvas_csv(self, tmp_path):
         """El entrenamiento debe generar el archivo de curvas CSV."""
-        from neural_network.data.dataset import InteractionDataset, construir_positivos_por_cliente
+        import pandas as pd
+        from neural_network.data.dataset import InteractionDataset
         from neural_network.training.trainer import Trainer
 
         rng = np.random.default_rng(7)
@@ -201,14 +219,16 @@ class TestTrainer:
         clientes = rng.integers(0, 5, n_pos).astype(np.int64)
         productos = rng.integers(0, 10, n_pos).astype(np.int64)
         clv = rng.uniform(0, 1, n_pos).astype(np.float32)
-        positivos = construir_positivos_por_cliente(clientes, productos)
+        df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+        positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
 
         ds = InteractionDataset(clientes, productos, clv, positivos, 10, k=1, semilla=42)
         cfg = self._cfg_minimo(tmp_path)
 
         modelo = MultiTaskNet(
             n_clientes=5, n_productos=10, dim_embedding=4,
-            capas_tronco=[], dropout=0.0, usar_layer_norm=False, usar_features=False,
+            capas_tronco=[], capas_rec=[8], dropout=0.0,
+            usar_layer_norm=False, usar_features=False,
         )
         trainer = Trainer(modelo=modelo, dataset_train=ds, dataset_val=ds, cfg=cfg)
         trainer.entrenar()

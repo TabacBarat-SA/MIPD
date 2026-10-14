@@ -101,6 +101,7 @@ def evaluar_recomendacion(
 
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
+    batch_size_scoring: int = cfg["evaluacion"].get("batch_size_scoring", 4096)
 
     # Relevantes por cliente en test
     relevantes_test: dict[int, set[int]] = {}
@@ -144,27 +145,15 @@ def evaluar_recomendacion(
             # ── Ranking del modelo ────────────────────────────────────── #
             feat = None
             if features_map is not None:
-                feat = features_map.get(c)
-                if feat is not None:
-                    feat = feat.unsqueeze(0)  # (1, n_feat)
+                feat = features_map.get(c)  # shape (n_features,) o None
 
-            c_tensor = torch.tensor([c], dtype=torch.long, device=device)
-            # Puntuar todos los productos
-            all_products = torch.arange(n_productos, dtype=torch.long, device=device)
-
-            # Batch para evitar OOM en GPU con muchos productos
-            batch_size = 4096
-            logits_list = []
-            for i in range(0, n_productos, batch_size):
-                p_batch = all_products[i:i + batch_size]
-                c_batch = c_tensor.expand(len(p_batch))
-                f_batch = None
-                if feat is not None:
-                    f_batch = feat.expand(len(p_batch), -1)
-                _, logit = modelo(c_batch, p_batch, f_batch)
-                logits_list.append(logit.cpu())
-
-            logits = torch.cat(logits_list).numpy()  # (n_productos,)
+            # Usa el método centralizado del modelo (evita duplicar la lógica de batching)
+            logits = modelo.score_todos_los_productos(
+                customer_idx=c,
+                device=device,
+                features_cliente=feat,
+                batch_size=batch_size_scoring,
+            ).numpy()  # (n_productos,)
 
             # Mask excluidos
             for ex in excluidos:

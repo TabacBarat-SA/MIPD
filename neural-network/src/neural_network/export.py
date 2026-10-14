@@ -96,8 +96,9 @@ def exportar_predicciones_rec(
     n_productos = modelo.n_productos
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
+    batch_size_scoring: int = cfg["evaluacion"].get("batch_size_scoring", 4096)
 
-    clientes_test = list(interacciones_test[col_c].unique())
+    clientes_test_list = list(interacciones_test[col_c].unique())
 
     ruta_salida.parent.mkdir(parents=True, exist_ok=True)
     with ruta_salida.open("w", newline="", encoding="utf-8") as f:
@@ -106,28 +107,21 @@ def exportar_predicciones_rec(
 
         modelo.eval()
         with torch.no_grad():
-            for c in clientes_test:
+            for c in clientes_test_list:
                 excluidos = positivos_excluidos.get(int(c), set())
-
-                all_p = torch.arange(n_productos, dtype=torch.long, device=device)
-                c_t = torch.tensor([int(c)], dtype=torch.long, device=device)
 
                 feat = None
                 if features_map is not None:
-                    f_t = features_map.get(int(c))
-                    if f_t is not None:
-                        feat = f_t.unsqueeze(0)
+                    feat = features_map.get(int(c))  # shape (n_features,) o None
 
-                batch_size = 4096
-                logits_list = []
-                for i in range(0, n_productos, batch_size):
-                    p_batch = all_p[i:i + batch_size]
-                    c_batch = c_t.expand(len(p_batch))
-                    fb = feat.expand(len(p_batch), -1) if feat is not None else None
-                    _, logit = modelo(c_batch, p_batch, fb)
-                    logits_list.append(logit.cpu())
+                # Usa el método centralizado del modelo
+                logits = modelo.score_todos_los_productos(
+                    customer_idx=int(c),
+                    device=device,
+                    features_cliente=feat,
+                    batch_size=batch_size_scoring,
+                ).numpy()
 
-                logits = torch.cat(logits_list).numpy()
                 for ex in excluidos:
                     if 0 <= ex < n_productos:
                         logits[ex] = -np.inf
@@ -139,7 +133,7 @@ def exportar_predicciones_rec(
                         break
                     w.writerow([int(c), int(p_idx), round(score, 6), rank])
 
-    print(f"[export] predictions_rec.csv ({len(clientes_test)} clientes, top-{k_max}) → {ruta_salida}")
+    print(f"[export] predictions_rec.csv ({len(clientes_test_list)} clientes, top-{k_max}) → {ruta_salida}")
 
 
 def exportar_mapeos(
@@ -154,21 +148,16 @@ def exportar_mapeos(
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
 
-    # customer_idx → customer_unique_id (si está disponible en interacciones)
+    # customer_idx → customer_unique_id (vectorizado, sin iterrows)
     if "customer_unique_id" in interacciones_train.columns:
-        c_map = {
-            str(int(r[col_c])): r["customer_unique_id"]
-            for _, r in interacciones_train[[col_c, "customer_unique_id"]].drop_duplicates().iterrows()
-        }
+        df_c = interacciones_train[[col_c, "customer_unique_id"]].drop_duplicates()
+        c_map = dict(zip(df_c[col_c].astype(int).astype(str), df_c["customer_unique_id"]))
     else:
         c_idxs = interacciones_train[col_c].unique()
         c_map = {str(int(ci)): str(int(ci)) for ci in c_idxs}
 
-    # product_idx → product_id
-    p_map = {
-        str(int(r[col_p])): r["product_id"]
-        for _, r in productos[[col_p, "product_id"]].iterrows()
-    }
+    # product_idx → product_id (vectorizado, sin iterrows)
+    p_map = dict(zip(productos[col_p].astype(int).astype(str), productos["product_id"]))
 
     for nombre, mapa in [("customer_idx_to_id.json", c_map), ("product_idx_to_id.json", p_map)]:
         ruta = artifacts_dir / nombre

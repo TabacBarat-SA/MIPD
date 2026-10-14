@@ -15,6 +15,13 @@ Diseño:
     - Muestreo sesgado por popularidad^0.75 (calculado solo en train) si se
       proporciona el array ``popularidad``.
     - ``__len__`` = (nº positivos) × (1 + k), garantizando proporción exacta 1:k.
+
+Optimización del negative sampling:
+    - Los negativos se generan agrupando por cliente (no por positivo individual),
+      lo que evita la complejidad O(n_positivos × n_productos) del loop original.
+    - Para cada cliente único se llama una sola vez a ``np.setdiff1d`` y a
+      ``rng.choice``, reduciendo el número de operaciones numpy de
+      ``n_positivos`` a ``n_clientes_únicos``.
 """
 from __future__ import annotations
 
@@ -77,7 +84,15 @@ class InteractionDataset(Dataset):
         self._semilla = semilla
         self._n_pos = len(clientes_idx)
 
-        # Almacena los negativos generados: lista de (cliente_idx, producto_idx)
+        # Mapa cliente → CLV (para asignar clv a los negativos del mismo cliente)
+        self._clv_por_cliente: dict[int, float] = {}
+        for c, clv in zip(self._clientes_pos.tolist(), self._clv_pos.tolist()):
+            self._clv_por_cliente[int(c)] = float(clv)
+
+        # Índices únicos de clientes presentes en los positivos (para agrupar)
+        self._clientes_unicos: np.ndarray = np.unique(self._clientes_pos)
+
+        # Almacena los negativos generados
         self._negativos_clientes: np.ndarray = np.empty(0, dtype=np.int64)
         self._negativos_productos: np.ndarray = np.empty(0, dtype=np.int64)
         self._clv_neg: np.ndarray = np.empty(0, dtype=np.float32)
@@ -86,11 +101,16 @@ class InteractionDataset(Dataset):
         self.regenerar_negativos()
 
     # ------------------------------------------------------------------ #
-    #  Negative sampling                                                   #
+    #  Negative sampling (vectorizado por cliente)                        #
     # ------------------------------------------------------------------ #
 
     def regenerar_negativos(self) -> None:
-        """Genera o regenera los negativos.
+        """Genera o regenera los negativos de forma vectorizada.
+
+        Optimización clave: en vez de iterar sobre cada positivo individual
+        (O(n_pos)), itera sobre clientes únicos (O(n_clientes_únicos)).
+        Por cada cliente se determina cuántos negativos necesita (n_pos_c × k)
+        y se muestrea de una sola llamada a ``rng.choice``.
 
         En modo ``semilla != None`` (val/test) usa la semilla fija → mismos
         negativos en cada época, garantizando comparabilidad.
@@ -102,44 +122,57 @@ class InteractionDataset(Dataset):
             else np.random.default_rng()
         )
 
-        neg_c_list: list[int] = []
-        neg_p_list: list[int] = []
-        neg_clv_list: list[float] = []
+        todos_productos = np.arange(self._n_productos, dtype=np.int64)
 
-        for i in range(self._n_pos):
-            c = int(self._clientes_pos[i])
-            clv = float(self._clv_pos[i])
-            positivos_c = self._positivos_por_cliente.get(c, set())
+        neg_c_list: list[np.ndarray] = []
+        neg_p_list: list[np.ndarray] = []
+        neg_clv_list: list[np.ndarray] = []
+
+        # Mapa cliente → número de positivos (para calcular cuántos negativos generar)
+        conteo_pos_por_cliente: dict[int, int] = {}
+        for c in self._clientes_pos:
+            conteo_pos_por_cliente[int(c)] = conteo_pos_por_cliente.get(int(c), 0) + 1
+
+        for c in self._clientes_unicos:
+            c_int = int(c)
+            positivos_c = self._positivos_por_cliente.get(c_int, set())
 
             # Candidatos: todos los productos menos los positivos del cliente
-            candidatos = np.arange(self._n_productos, dtype=np.int64)
-            mask = np.ones(self._n_productos, dtype=bool)
-            for p in positivos_c:
-                if 0 <= p < self._n_productos:
-                    mask[p] = False
-            candidatos = candidatos[mask]
+            # np.setdiff1d es O(n log n) pero se llama una vez por cliente, no por positivo
+            pos_arr = np.fromiter(positivos_c, dtype=np.int64) if positivos_c else np.empty(0, dtype=np.int64)
+            candidatos = np.setdiff1d(todos_productos, pos_arr, assume_unique=False)
 
             if len(candidatos) == 0:
                 continue  # caso extremo: cliente compró todo
 
+            # Número de negativos necesarios = n_positivos_del_cliente × k
+            n_pos_c = conteo_pos_por_cliente.get(c_int, 0)
+            n_neg_necesarios = n_pos_c * self._k
+            n_neg = min(n_neg_necesarios, len(candidatos))
+
             # Probabilidades de muestreo
-            if self._popularidad is not None and len(candidatos) > 0:
+            if self._popularidad is not None:
                 probs = self._popularidad[candidatos]
                 s = probs.sum()
                 probs = probs / s if s > 0 else np.ones(len(candidatos)) / len(candidatos)
             else:
                 probs = None
 
-            n_neg = min(self._k, len(candidatos))
-            elegidos = rng.choice(candidatos, size=n_neg, replace=False, p=probs)
+            elegidos = rng.choice(candidatos, size=n_neg, replace=(n_neg > len(candidatos)), p=probs)
 
-            neg_c_list.extend([c] * n_neg)
-            neg_p_list.extend(elegidos.tolist())
-            neg_clv_list.extend([clv] * n_neg)
+            clv_c = self._clv_por_cliente.get(c_int, 0.0)
+            neg_c_list.append(np.full(n_neg, c_int, dtype=np.int64))
+            neg_p_list.append(elegidos.astype(np.int64))
+            neg_clv_list.append(np.full(n_neg, clv_c, dtype=np.float32))
 
-        self._negativos_clientes = np.array(neg_c_list, dtype=np.int64)
-        self._negativos_productos = np.array(neg_p_list, dtype=np.int64)
-        self._clv_neg = np.array(neg_clv_list, dtype=np.float32)
+        if neg_c_list:
+            self._negativos_clientes = np.concatenate(neg_c_list)
+            self._negativos_productos = np.concatenate(neg_p_list)
+            self._clv_neg = np.concatenate(neg_clv_list)
+        else:
+            self._negativos_clientes = np.empty(0, dtype=np.int64)
+            self._negativos_productos = np.empty(0, dtype=np.int64)
+            self._clv_neg = np.empty(0, dtype=np.float32)
 
     # ------------------------------------------------------------------ #
     #  Dataset interface                                                   #
@@ -179,18 +212,7 @@ class InteractionDataset(Dataset):
         )
 
 
-# ─── Funciones auxiliares de construcción ──────────────────────────────────── #
-
-def construir_positivos_por_cliente(
-    clientes_idx: np.ndarray,
-    productos_idx: np.ndarray,
-) -> dict[int, set[int]]:
-    """Construye el mapa {customer_idx → set(product_idx)} a partir de arrays."""
-    positivos: dict[int, set[int]] = {}
-    for c, p in zip(clientes_idx, productos_idx):
-        positivos.setdefault(int(c), set()).add(int(p))
-    return positivos
-
+# ─── Función de construcción ────────────────────────────────────────────────── #
 
 def construir_dataset(
     interacciones: Any,  # pd.DataFrame
@@ -221,6 +243,9 @@ def construir_dataset(
     semilla:
         Semilla fija para val/test (None para train).
     """
+    # Importa la función canónica desde preprocessing para evitar duplicación
+    from neural_network.data.preprocessing import construir_positivos_por_cliente
+
     col_c = cfg["columnas"]["interaccion_cliente_idx"]
     col_p = cfg["columnas"]["interaccion_producto_idx"]
     col_clv = cfg["columnas"]["clv_target"]
@@ -237,8 +262,8 @@ def construir_dataset(
         [clv_map.get(int(c), 0.0) for c in clientes_arr], dtype=np.float32
     )
 
-    # Positivos del split actual
-    pos_split = construir_positivos_por_cliente(clientes_arr, productos_arr)
+    # Positivos del split actual (usa la función canónica)
+    pos_split = construir_positivos_por_cliente(interacciones, col_c, col_p)
 
     # Unión con positivos a excluir (para val/test)
     if positivos_excluir:

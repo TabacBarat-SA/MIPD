@@ -11,9 +11,9 @@ import torch
 
 from neural_network.data.dataset import (
     InteractionDataset,
-    construir_positivos_por_cliente,
     construir_dataset,
 )
+from neural_network.data.preprocessing import construir_positivos_por_cliente
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────── #
@@ -36,7 +36,9 @@ def datos_sinteticos():
 @pytest.fixture
 def dataset_sintetico(datos_sinteticos):
     clientes, productos, clv, n_clientes, n_productos = datos_sinteticos
-    positivos = construir_positivos_por_cliente(clientes, productos)
+    import pandas as pd
+    df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+    positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
     k = 3
     ds = InteractionDataset(
         clientes_idx=clientes,
@@ -111,8 +113,10 @@ class TestInteractionDataset:
 
     def test_negativos_fijos_con_semilla(self, datos_sinteticos):
         """Con la misma semilla, los negativos deben ser idénticos."""
+        import pandas as pd
         clientes, productos, clv, n_clientes, n_productos = datos_sinteticos
-        positivos = construir_positivos_por_cliente(clientes, productos)
+        df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+        positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
 
         ds1 = InteractionDataset(clientes, productos, clv, positivos, n_productos, k=3, semilla=99)
         ds2 = InteractionDataset(clientes, productos, clv, positivos, n_productos, k=3, semilla=99)
@@ -121,8 +125,10 @@ class TestInteractionDataset:
 
     def test_regeneracion_cambia_negativos_en_train(self, datos_sinteticos):
         """Sin semilla (modo train), regenerar_negativos() produce negativos distintos."""
+        import pandas as pd
         clientes, productos, clv, n_clientes, n_productos = datos_sinteticos
-        positivos = construir_positivos_por_cliente(clientes, productos)
+        df = pd.DataFrame({"customer_idx": clientes, "product_idx": productos})
+        positivos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
 
         ds = InteractionDataset(clientes, productos, clv, positivos, n_productos, k=3, semilla=None)
         neg_antes = ds._negativos_productos.copy()
@@ -149,9 +155,12 @@ class TestInteractionDataset:
 class TestConstruirPositivos:
 
     def test_construir_positivos_correcto(self):
-        clientes = np.array([0, 0, 1, 2, 2])
-        productos = np.array([5, 10, 5, 3, 7])
-        pos = construir_positivos_por_cliente(clientes, productos)
+        import pandas as pd
+        df = pd.DataFrame({
+            "customer_idx": [0, 0, 1, 2, 2],
+            "product_idx":  [5, 10, 5, 3, 7],
+        })
+        pos = construir_positivos_por_cliente(df, "customer_idx", "product_idx")
         assert pos[0] == {5, 10}
         assert pos[1] == {5}
         assert pos[2] == {3, 7}

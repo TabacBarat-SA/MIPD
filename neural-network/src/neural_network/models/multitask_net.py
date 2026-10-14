@@ -19,11 +19,15 @@ Arquitectura:
 Decisiones:
     - Cabeza CLV: solo usa el embedding/representación del cliente.
     - Cabeza Rec: concatena la representación del cliente con el embedding
-      del producto y pasa por un MLP → logit.
+      del producto y pasa por un MLP → logit (capas configurables en config.yaml).
     - Embeddings inicializados con Normal(0, 0.01).
     - LayerNorm y Dropout configurables.
     - ``usar_features=True``: concatena features numéricas al embedding
       antes del tronco. Requiere que el caller normalice las features.
+    - ``predict_clv()``: método que infiere CLV sin necesitar un producto,
+      evitando el anti-patrón de pasar un producto ficticio desde el pipeline.
+    - ``score_todos_los_productos()``: función pública centralizada de scoring
+      usada por evaluación y exportación para evitar duplicación de lógica.
 """
 from __future__ import annotations
 
@@ -78,6 +82,8 @@ class MultiTaskNet(nn.Module):
         Dimensión de los embeddings de cliente y producto.
     capas_tronco : list[int]
         Capas del MLP compartido. Lista vacía = sin tronco.
+    capas_rec : list[int]
+        Capas del MLP de la cabeza de recomendación (sin contar la capa final →1).
     dropout : float
         Probabilidad de Dropout.
     usar_layer_norm : bool
@@ -94,6 +100,7 @@ class MultiTaskNet(nn.Module):
         n_productos: int,
         dim_embedding: int = 64,
         capas_tronco: list[int] | None = None,
+        capas_rec: list[int] | None = None,
         dropout: float = 0.3,
         usar_layer_norm: bool = True,
         usar_features: bool = True,
@@ -103,6 +110,8 @@ class MultiTaskNet(nn.Module):
 
         if capas_tronco is None:
             capas_tronco = [128, 64]
+        if capas_rec is None:
+            capas_rec = [64]
 
         self.n_clientes = n_clientes
         self.n_productos = n_productos
@@ -140,14 +149,20 @@ class MultiTaskNet(nn.Module):
         nn.init.zeros_(self.cabeza_clv.bias)
 
         # ── Cabeza Recomendación ──────────────────────────────────────────── #
-        # Entrada: [rep_cliente || emb_producto] → MLP → logit
+        # Entrada: [rep_cliente || emb_producto] → MLP (capas configurables) → logit
         dim_rec_in = dim_tronco_out + dim_embedding
-        self.cabeza_rec = nn.Sequential(
-            nn.Linear(dim_rec_in, 64),
-            nn.LayerNorm(64) if usar_layer_norm else nn.Identity(),
-            nn.ReLU(),
-            nn.Dropout(dropout) if dropout > 0 else nn.Identity(),
-            nn.Linear(64, 1),
+        # Construye MLP + capa de salida final
+        capas_rec_completas = list(capas_rec) + [1]
+        self.cabeza_rec = _bloque_mlp(
+            dim_entrada=dim_rec_in,
+            capas=capas_rec_completas[:-1],  # capas ocultas
+            dropout=dropout,
+            usar_layer_norm=usar_layer_norm,
+        )
+        # Última capa lineal sin activación ni dropout (logit crudo)
+        self.cabeza_rec_out = nn.Linear(
+            capas_rec_completas[-2] if len(capas_rec_completas) > 1 else dim_rec_in,
+            1,
         )
 
     # ------------------------------------------------------------------ #
@@ -178,33 +193,78 @@ class MultiTaskNet(nn.Module):
         rec_logit : Tensor[float] shape (B,)
             Logit de probabilidad de compra (sin sigmoide).
         """
-        # Embeddings base
-        e_c = self.emb_cliente(cliente)       # (B, dim_embedding)
-        e_p = self.emb_producto(producto)     # (B, dim_embedding)
-
-        # Concatenar features de cliente si procede
-        if self.usar_features:
-            if features_cliente is None:
-                features_cliente = torch.zeros(e_c.size(0), self.n_features_cliente, device=e_c.device, dtype=e_c.dtype)
-            x_c = torch.cat([e_c, features_cliente], dim=-1)  # (B, dim+n_feat)
-        else:
-            x_c = e_c  # (B, dim_embedding)
-
-        # Tronco compartido
-        rep_c = self.tronco(x_c)  # (B, dim_tronco_out)
+        rep_c = self._representacion_cliente(cliente, features_cliente)
 
         # Cabeza CLV
         clv_pred = self.cabeza_clv(rep_c).squeeze(-1)  # (B,)
 
         # Cabeza Recomendación
-        rec_in = torch.cat([rep_c, e_p], dim=-1)       # (B, dim_tronco_out + dim_emb)
-        rec_logit = self.cabeza_rec(rec_in).squeeze(-1)  # (B,)
+        e_p = self.emb_producto(producto)               # (B, dim_embedding)
+        rec_in = torch.cat([rep_c, e_p], dim=-1)        # (B, dim_tronco_out + dim_emb)
+        rec_hidden = self.cabeza_rec(rec_in)             # (B, capas_rec[-1]) o (B, dim_rec_in)
+        rec_logit = self.cabeza_rec_out(rec_hidden).squeeze(-1)  # (B,)
 
         return clv_pred, rec_logit
+
+    def _representacion_cliente(
+        self,
+        cliente: torch.Tensor,
+        features_cliente: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Calcula la representación del cliente (embedding + tronco).
+
+        Parámetros
+        ----------
+        cliente : Tensor[long] shape (B,)
+        features_cliente : Tensor[float] shape (B, n_features_cliente) | None
+
+        Devuelve
+        -------
+        rep_c : Tensor[float] shape (B, dim_tronco_out)
+        """
+        e_c = self.emb_cliente(cliente)  # (B, dim_embedding)
+
+        if self.usar_features:
+            if features_cliente is None:
+                features_cliente = torch.zeros(
+                    e_c.size(0), self.n_features_cliente,
+                    device=e_c.device, dtype=e_c.dtype,
+                )
+            x_c = torch.cat([e_c, features_cliente], dim=-1)
+        else:
+            x_c = e_c
+
+        return self.tronco(x_c)
 
     # ------------------------------------------------------------------ #
     #  Métodos auxiliares                                                  #
     # ------------------------------------------------------------------ #
+
+    @torch.no_grad()
+    def predict_clv(
+        self,
+        cliente: torch.Tensor,
+        features_cliente: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Predice el CLV para un batch de clientes sin necesitar producto.
+
+        A diferencia del ``forward`` principal, este método NO usa ningún
+        producto de relleno: calcula directamente la representación del cliente
+        y aplica la cabeza CLV. Es el método correcto para inferencia de CLV.
+
+        Parámetros
+        ----------
+        cliente : Tensor[long] shape (B,)
+            Índices de clientes.
+        features_cliente : Tensor[float] shape (B, n_features_cliente) | None
+
+        Devuelve
+        -------
+        clv_pred : Tensor[float] shape (B,)
+            Predicción de CLV en escala log1p.
+        """
+        rep_c = self._representacion_cliente(cliente, features_cliente)
+        return self.cabeza_clv(rep_c).squeeze(-1)
 
     def get_customer_embeddings(self) -> torch.Tensor:
         """Devuelve la matriz de embeddings de clientes (n_clientes, dim_embedding)."""
@@ -215,41 +275,60 @@ class MultiTaskNet(nn.Module):
         return self.emb_producto.weight.detach().cpu()
 
     @torch.no_grad()
-    def score_all_products(
+    def score_todos_los_productos(
         self,
         customer_idx: int,
         device: torch.device | None = None,
         features_cliente: torch.Tensor | None = None,
+        batch_size: int = 4096,
     ) -> torch.Tensor:
-        """Puntúa todos los productos para un cliente dado.
+        """Puntúa todos los productos para un cliente dado (con batching).
+
+        Esta es la función centralizada que deben usar ``rec_metrics`` y
+        ``export`` para evitar duplicación de lógica. Maneja automáticamente
+        el batching para no provocar OOM en GPU.
 
         Parámetros
         ----------
         customer_idx : int
             Índice del cliente.
         device : torch.device | None
-            Dispositivo de cómputo. Si None, usa CPU.
+            Dispositivo de cómputo. Si None, usa el dispositivo del modelo.
         features_cliente : Tensor[float] shape (n_features_cliente,) | None
-            Features del cliente, requerido si ``usar_features=True``.
+            Features del cliente (sin dimensión batch).
+        batch_size : int
+            Número de productos por batch.
 
         Devuelve
         -------
-        scores : Tensor[float] shape (n_productos,)
+        logits : Tensor[float] shape (n_productos,)
             Logits de compra para cada producto.
         """
         if device is None:
             device = next(self.parameters()).device
 
         n = self.n_productos
-        c_tensor = torch.full((n,), customer_idx, dtype=torch.long, device=device)
-        p_tensor = torch.arange(n, dtype=torch.long, device=device)
+        logits_list: list[torch.Tensor] = []
 
-        feat = None
+        feat_batch = None
         if self.usar_features and features_cliente is not None:
-            feat = features_cliente.to(device).unsqueeze(0).expand(n, -1)
+            feat_expandida = features_cliente.to(device)  # (n_features,)
 
-        _, logits = self.forward(c_tensor, p_tensor, feat)
-        return logits.cpu()
+        for i in range(0, n, batch_size):
+            p_batch = torch.arange(i, min(i + batch_size, n), dtype=torch.long, device=device)
+            bs = len(p_batch)
+            c_batch = torch.full((bs,), customer_idx, dtype=torch.long, device=device)
+
+            if self.usar_features and features_cliente is not None:
+                feat_batch = feat_expandida.unsqueeze(0).expand(bs, -1)
+
+            _, logit = self.forward(c_batch, p_batch, feat_batch)
+            logits_list.append(logit.cpu())
+
+        return torch.cat(logits_list)
+
+    # Alias para compatibilidad hacia atrás
+    score_all_products = score_todos_los_productos
 
     @classmethod
     def desde_config(cls, cfg: dict[str, Any]) -> "MultiTaskNet":
@@ -260,6 +339,7 @@ class MultiTaskNet(nn.Module):
             n_productos=m["n_productos"],
             dim_embedding=m["dim_embedding"],
             capas_tronco=m.get("capas_tronco", [128, 64]),
+            capas_rec=m.get("capas_rec", [64]),
             dropout=m["dropout"],
             usar_layer_norm=m["usar_layer_norm"],
             usar_features=m["usar_features"],

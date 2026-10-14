@@ -22,3 +22,8 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["neural-network/src"]
 testpaths = ["neural-network/tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

@@ -14,6 +14,11 @@ Flujo por época:
     4. Llama a EarlyStopping; si dispara, restaura mejores pesos y guarda checkpoint.
     5. Registra curvas (CSV + PNG) en artifacts/.
 
+Normalización de features:
+    Las stats (media, std) se calculan SOLO sobre el split de train y se
+    aplican a val/test para evitar data leakage. Se persisten en el checkpoint
+    para que evaluate.py pueda reproducirlas sin acceso al train.
+
 Soporte CPU/GPU automático.
 """
 from __future__ import annotations
@@ -48,6 +53,88 @@ def _fijar_semillas(semilla: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
+def calcular_stats_normalizacion(
+    clientes_train_df: Any,  # pd.DataFrame
+    cfg: dict[str, Any],
+) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+    """Calcula media y std de las features SOLO sobre el split de train.
+
+    Estas stats deben aplicarse a todos los splits (train, val, test) para
+    evitar data leakage. Se devuelven como arrays numpy para persistirse
+    en el checkpoint y usarse en inferencia posterior.
+
+    Parámetros
+    ----------
+    clientes_train_df : pd.DataFrame
+        DataFrame de clientes del split de entrenamiento.
+    cfg : dict
+        Configuración completa.
+
+    Devuelve
+    -------
+    (mean, std) : arrays shape (n_features,), o (None, None) si usar_features=False.
+    """
+    if not cfg["modelo"]["usar_features"] or clientes_train_df is None:
+        return None, None
+
+    names = cfg["columnas"]["features_cliente"]
+    arr = clientes_train_df[names].to_numpy(dtype=np.float32)
+    mean = arr.mean(axis=0)        # (n_features,)
+    std  = arr.std(axis=0) + 1e-8  # (n_features,)
+    return mean, std
+
+
+def construir_features_map(
+    clientes_df: Any,          # pd.DataFrame
+    cfg: dict[str, Any],
+    mean: np.ndarray | None,
+    std: np.ndarray | None,
+) -> dict[int, torch.Tensor] | None:
+    """Construye mapa {customer_idx → tensor de features} con normalización consistente.
+
+    Parámetros
+    ----------
+    clientes_df : pd.DataFrame
+        DataFrame de clientes del split a procesar.
+    cfg : dict
+        Configuración completa.
+    mean : np.ndarray | None
+        Media de las features calculada sobre TRAIN. Si None, se calcula localmente
+        (solo válido para el split de entrenamiento en el primer ciclo).
+    std : np.ndarray | None
+        Desviación estándar de las features calculada sobre TRAIN.
+
+    Devuelve
+    -------
+    dict[int, Tensor] | None
+        Mapa {customer_idx → tensor normalizado}, o None si usar_features=False.
+    """
+    if not cfg["modelo"]["usar_features"] or clientes_df is None:
+        return None
+
+    col_c = cfg["columnas"]["cliente_idx"]
+    names = cfg["columnas"]["features_cliente"]
+
+    arr = clientes_df[names].to_numpy(dtype=np.float32)
+
+    if mean is None or std is None:
+        # Fallback: normalización local (solo para construcción interna del train map)
+        mean = arr.mean(axis=0, keepdims=True)
+        std  = arr.std(axis=0, keepdims=True) + 1e-8
+
+    arr = (arr - mean) / std
+
+    feats_map: dict[int, torch.Tensor] = {}
+    for i, c_idx in enumerate(clientes_df[col_c].tolist()):
+        feats_map[int(c_idx)] = torch.tensor(arr[i], dtype=torch.float32)
+
+    return feats_map
+
+
+# Alias privado para compatibilidad con pipeline.py (que importa el nombre anterior)
+_construir_features_map = construir_features_map
+
+
 def _calcular_perdida_batch(
     modelo: MultiTaskNet,
     batch: tuple[torch.Tensor, ...],
@@ -67,9 +154,7 @@ def _calcular_perdida_batch(
     # Construir features_cliente si procede
     feats = None
     if features_map is not None and n_features > 0:
-        rows = []
-        for ci in c_idx.cpu().tolist():
-            rows.append(features_map.get(ci, torch.zeros(n_features)))
+        rows = [features_map.get(ci, torch.zeros(n_features)) for ci in c_idx.cpu().tolist()]
         feats = torch.stack(rows).to(device)
 
     clv_pred, rec_logit = modelo(c_idx, p_idx, feats)
@@ -79,33 +164,6 @@ def _calcular_perdida_batch(
     loss_total = loss_clv + lambda_rec * loss_rec
 
     return loss_total, loss_clv, loss_rec
-
-
-def _construir_features_map(
-    clientes_df: Any,  # pd.DataFrame
-    cfg: dict[str, Any],
-    device: torch.device,
-) -> dict[int, torch.Tensor] | None:
-    """Construye mapa {customer_idx → tensor de features} para lookup rápido."""
-    if not cfg["modelo"]["usar_features"]:
-        return None
-
-    col_c = cfg["columnas"]["cliente_idx"]
-    names = cfg["columnas"]["features_cliente"]
-    feats_map: dict[int, torch.Tensor] = {}
-
-    arr = clientes_df[names].to_numpy(dtype=np.float32)
-    # Normalización simple: z-score por columna (solo stats del propio split)
-    # Nota: en producción habría que usar stats del train también en val/test.
-    # Aquí usamos la media/std del DataFrame recibido (aceptable para Semana 4).
-    mean = arr.mean(axis=0, keepdims=True)
-    std = arr.std(axis=0, keepdims=True) + 1e-8
-    arr = (arr - mean) / std
-
-    for i, c_idx in enumerate(clientes_df[col_c].tolist()):
-        feats_map[int(c_idx)] = torch.tensor(arr[i], dtype=torch.float32)
-
-    return feats_map
 
 
 class Trainer:
@@ -119,9 +177,9 @@ class Trainer:
     cfg : dict
         Configuración completa.
     clientes_train_df : pd.DataFrame
-        Usado para construir el mapa de features de clientes.
+        Usado para calcular las stats de normalización de features (SOLO train).
     clientes_val_df : pd.DataFrame
-        Usado para el mapa de features en validación.
+        Usado para construir el mapa de features de validación con stats de train.
     """
 
     def __init__(
@@ -144,12 +202,21 @@ class Trainer:
         self.dataset_train = dataset_train
         self.dataset_val = dataset_val
 
-        # Features maps
+        # ── Normalización: stats calculadas SOLO en train ─────────────── #
+        # Se calculan una vez y se aplican a train, val y test consistentemente.
         self.n_features = cfg["modelo"].get("n_features_cliente", 9) if cfg["modelo"]["usar_features"] else 0
-        self.features_train = _construir_features_map(clientes_train_df, cfg, self.device) if clientes_train_df is not None else None
-        self.features_val = _construir_features_map(clientes_val_df, cfg, self.device) if clientes_val_df is not None else None
+        self.features_mean: np.ndarray | None
+        self.features_std: np.ndarray | None
+        self.features_mean, self.features_std = calcular_stats_normalizacion(clientes_train_df, cfg)
 
-        # DataLoaders
+        self.features_train = construir_features_map(
+            clientes_train_df, cfg, self.features_mean, self.features_std
+        ) if clientes_train_df is not None else None
+        self.features_val = construir_features_map(
+            clientes_val_df, cfg, self.features_mean, self.features_std
+        ) if clientes_val_df is not None else None
+
+        # ── DataLoaders ───────────────────────────────────────────────── #
         e = cfg["entrenamiento"]
         self.loader_train = DataLoader(
             dataset_train,
@@ -165,27 +232,27 @@ class Trainer:
             num_workers=0,
         )
 
-        # Optimizador
+        # ── Optimizador ───────────────────────────────────────────────── #
         self.optimizer = torch.optim.AdamW(
             modelo.parameters(),
             lr=e["lr"],
             weight_decay=e["weight_decay"],
         )
 
-        # Criterios de pérdida
+        # ── Criterios de pérdida ──────────────────────────────────────── #
         self.criterio_clv = nn.HuberLoss(delta=e["huber_delta"])
         self.criterio_rec = nn.BCEWithLogitsLoss()
         self.lambda_rec: float = float(e["lambda_rec"])
         self.grad_clip: float = float(e["grad_clip"])
 
-        # Early stopping
+        # ── Early stopping ────────────────────────────────────────────── #
         es_cfg = cfg["early_stopping"]
         self.early_stopping = EarlyStopping(
             patience=es_cfg["patience"],
             min_delta=es_cfg["min_delta"],
         )
 
-        # Rutas de artefactos
+        # ── Rutas de artefactos ───────────────────────────────────────── #
         self.ruta_checkpoint: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["model_checkpoint"]
         self.ruta_curvas_csv: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["curvas_csv"]
         self.ruta_curvas_png: Path = cfg["_artifacts_dir_abs"] / cfg["logging"]["curvas_png"]
@@ -313,18 +380,25 @@ class Trainer:
     # ------------------------------------------------------------------ #
 
     def _guardar_checkpoint(self) -> None:
-        """Guarda el mejor modelo en disco con la config y el estado."""
+        """Guarda el mejor modelo en disco con la config, el estado y las stats de normalización.
+
+        Las stats de normalización (mean, std) se incluyen para que evaluate.py
+        y cualquier script de inferencia puedan reproducir la misma normalización
+        sin acceder al split de train.
+        """
         torch.save({
             "model_state_dict": self.modelo.state_dict(),
             "config": self.cfg,
             "mejor_epoca": self.early_stopping.mejor_epoca,
             "mejor_val_loss": self.early_stopping.mejor_loss,
+            # Stats de normalización calculadas sobre train (evita data leakage en inferencia)
+            "features_mean": self.features_mean,
+            "features_std": self.features_std,
         }, self.ruta_checkpoint)
         print(f"[trainer] Checkpoint guardado: {self.ruta_checkpoint}")
 
     def _guardar_curvas(self) -> None:
         """Guarda historial de curvas en CSV y PNG."""
-        # CSV
         if self.historial:
             keys = list(self.historial[0].keys())
             with self.ruta_curvas_csv.open("w", newline="", encoding="utf-8") as f:
