@@ -12,6 +12,9 @@ dependencies = [
     "scipy>=1.11.0",      # Correlación de Spearman y otras métricas estadísticas
     "pyyaml>=6.0.0",      # Carga de config.yaml (configuración del módulo)
     "matplotlib>=3.7.0",  # Generación de gráficas de curvas de entrenamiento
+    "plotly>=7.1.0",
+    "streamlit>=1.66.0",
+    "scikit-learn>=1.9.1",
 ]
 
 [project.optional-dependencies]
