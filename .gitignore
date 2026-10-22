@@ -224,3 +224,15 @@ __marimo__/
 
 # Vs Code IDE
 .vscode/
+# Entorno y archivos locales
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+respaldo*/
+*.log

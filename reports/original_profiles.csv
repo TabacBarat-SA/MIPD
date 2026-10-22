@@ -1,0 +1,6 @@
+segment,customers,frequency,monetary,recency,clv_pred,name,action
+0,347,1.0,511.33585014409226,405.50521183557476,0.10271391124573828,Perfil 1,Venta cruzada personalizada; KPI: conversion a 90 dias
+1,55,1.0185185185185186,149.99907407407406,381.23732767489713,0.2958195732607241,Perfil 2,Venta cruzada personalizada; KPI: conversion a 90 dias
+2,98,2.061224489795918,287.21091836734695,294.27579329648523,2.140367201417146,Perfil 3,Venta cruzada personalizada; KPI: conversion a 90 dias
+3,1900,1.0057894736842106,103.58535789473684,406.874615673733,0.2886819578335459,Perfil 4,Reactivacion por email con consentimiento; KPI: recompra a 90 dias
+4,100,1.04,175.9308,405.85081620370374,0.11498083009753855,Perfil 5,Reactivacion por email con consentimiento; KPI: recompra a 90 dias

@@ -1,0 +1,5 @@
+source,model,split,Precision@10,Recall@10,NDCG@10,coverage,eligible_users
+original,Popularidad,val,0.0,0.0,0.0,0.0,0
+original,SVD,val,0.0,0.0,0.0,0.0,0
+original,Popularidad,test,0.0,0.0,0.0,0.03333333333333333,1
+original,SVD,test,0.0,0.0,0.0,0.03333333333333333,1

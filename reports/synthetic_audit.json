@@ -1,0 +1,11 @@
+{
+  "seed": 42,
+  "cohort_customers": 2500,
+  "catalog_products": 300,
+  "original_orders": 99441,
+  "added_orders": 30936,
+  "original_repeat_fraction": 0.031187562437562436,
+  "augmented_repeat_fraction_all": 0.05538211788211788,
+  "cohort_repeat_fraction": 0.9804,
+  "warning": "Escenario semisintetico, no evidencia de comportamiento real de Olist."
+}

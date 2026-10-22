@@ -1,0 +1,9 @@
+{
+  "source": "synthetic",
+  "n_targeted": 250,
+  "selected_observed_revenue": 275853.8125,
+  "random_expected_revenue": 78353.84375,
+  "random_mean_ci_low": 251.27037048339844,
+  "random_mean_ci_high": 376.53759765625,
+  "warning": "Ranking retrospectivo. No estima ingresos incrementales ni efecto causal de publicidad."
+}

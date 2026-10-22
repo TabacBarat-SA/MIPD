@@ -1,0 +1,9 @@
+{
+  "source": "original",
+  "n_targeted": 250,
+  "selected_observed_revenue": 218.45999145507812,
+  "random_expected_revenue": 189.3934326171875,
+  "random_mean_ci_low": 0.0,
+  "random_mean_ci_high": 2.991786003112793,
+  "warning": "Ranking retrospectivo. No estima ingresos incrementales ni efecto causal de publicidad."
+}

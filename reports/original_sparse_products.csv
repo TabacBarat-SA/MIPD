@@ -1,0 +1,13 @@
+source,split,group,products,relevant_pairs,model,Precision@10,Recall@10,NDCG@10,coverage,eligible_users
+original,val,0-2 interacciones train,300,0,Red conjunta,0.0,0.0,0.0,0.0,0
+original,val,0-2 interacciones train,300,0,Popularidad,0.0,0.0,0.0,0.0,0
+original,val,3-10 interacciones train,0,0,Red conjunta,0.0,0.0,0.0,0.0,0
+original,val,3-10 interacciones train,0,0,Popularidad,0.0,0.0,0.0,0.0,0
+original,val,11+ interacciones train,0,0,Red conjunta,0.0,0.0,0.0,0.0,0
+original,val,11+ interacciones train,0,0,Popularidad,0.0,0.0,0.0,0.0,0
+original,test,0-2 interacciones train,300,1,Red conjunta,0.0,0.0,0.0,0.03333333333333333,1
+original,test,0-2 interacciones train,300,1,Popularidad,0.0,0.0,0.0,0.03333333333333333,1
+original,test,3-10 interacciones train,0,0,Red conjunta,0.0,0.0,0.0,0.0,0
+original,test,3-10 interacciones train,0,0,Popularidad,0.0,0.0,0.0,0.0,0
+original,test,11+ interacciones train,0,0,Red conjunta,0.0,0.0,0.0,0.0,0
+original,test,11+ interacciones train,0,0,Popularidad,0.0,0.0,0.0,0.0,0

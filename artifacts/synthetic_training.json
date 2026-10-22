@@ -1,0 +1,12 @@
+{
+  "backend": "torch",
+  "device": "cuda",
+  "seed": 42,
+  "epochs_limit": 160,
+  "dim": 16,
+  "lambda": 2.0,
+  "negatives": 3,
+  "target": "gasto_3_meses",
+  "smearing": "residuos train",
+  "note": "No se presupone superioridad de la red."
+}

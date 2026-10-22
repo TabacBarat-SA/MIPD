@@ -1,0 +1,104 @@
+[
+  {
+    "theme": "light",
+    "page": "Resumen del negocio",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Conocer a un cliente",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Entender los grupos",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Preparar una campaña",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)",
+    "download_rows": 100
+  },
+  {
+    "theme": "light",
+    "page": "Comprobar los resultados",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Cómo funciona",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Guía de uso",
+    "errors": [],
+    "heading_color": "rgb(23, 43, 77)"
+  },
+  {
+    "theme": "light",
+    "page": "Guía de uso · viewport móvil",
+    "dimensions": {
+      "viewport": 390,
+      "document": 390
+    }
+  },
+  {
+    "theme": "dark",
+    "page": "Resumen del negocio",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Conocer a un cliente",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Entender los grupos",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Preparar una campaña",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)",
+    "download_rows": 100
+  },
+  {
+    "theme": "dark",
+    "page": "Comprobar los resultados",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Cómo funciona",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Guía de uso",
+    "errors": [],
+    "heading_color": "rgb(250, 250, 250)"
+  },
+  {
+    "theme": "dark",
+    "page": "Guía de uso · viewport móvil",
+    "dimensions": {
+      "viewport": 390,
+      "document": 390
+    }
+  }
+]

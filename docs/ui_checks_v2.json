@@ -1,0 +1,72 @@
+[
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Resumen del negocio",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Conocer a un cliente",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Entender los grupos",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Preparar una campaña",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Comprobar los resultados",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Cómo funciona",
+    "errors": []
+  },
+  {
+    "scenario": "Demostración con compras simuladas",
+    "page": "Guía de uso",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Resumen del negocio",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Conocer a un cliente",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Entender los grupos",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Preparar una campaña",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Comprobar los resultados",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Cómo funciona",
+    "errors": []
+  },
+  {
+    "scenario": "Datos originales · misma muestra",
+    "page": "Guía de uso",
+    "errors": []
+  }
+]

@@ -1,0 +1,5 @@
+source,split,model,categories,Precision@3,Recall@3,NDCG@3,coverage,eligible_users
+original,val,Red conjunta · agregación por categoría,10,0.0,0.0,0.0,0.0,0
+original,val,Popularidad de categoría,10,0.0,0.0,0.0,0.0,0
+original,test,Red conjunta · agregación por categoría,10,0.0,0.0,0.0,0.3,1
+original,test,Popularidad de categoría,10,0.0,0.0,0.0,0.3,1

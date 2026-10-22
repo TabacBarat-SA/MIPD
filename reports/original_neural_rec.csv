@@ -1,0 +1,5 @@
+source,model,split,Precision@10,Recall@10,NDCG@10,coverage,eligible_users
+original,multi,val,0.0,0.0,0.0,0.0,0
+original,multi,test,0.0,0.0,0.0,0.03333333333333333,1
+original,rec_only,val,0.0,0.0,0.0,0.0,0
+original,rec_only,test,0.0,0.0,0.0,0.03333333333333333,1

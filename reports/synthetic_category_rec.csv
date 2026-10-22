@@ -1,0 +1,5 @@
+source,split,model,categories,Precision@3,Recall@3,NDCG@3,coverage,eligible_users
+synthetic,val,Red conjunta · agregación por categoría,10,0.34326904344437953,0.7648938242743035,0.7742279461790419,1.0,1711
+synthetic,val,Popularidad de categoría,10,0.17319306448470678,0.3510422754724332,0.28568860987247535,0.3,1711
+synthetic,test,Red conjunta · agregación por categoría,10,0.35797748034841725,0.7765577104009227,0.7803964210742876,1.0,1569
+synthetic,test,Popularidad de categoría,10,0.18376885489696196,0.3651173024977996,0.29699395822064933,0.3,1569

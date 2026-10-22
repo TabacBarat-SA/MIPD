@@ -1,0 +1,5 @@
+{
+  "category_method": "Media de logits de productos por categoría; sin entrenamiento independiente ni nueva cabeza. Popularidad por pares cliente-producto train. Evaluación de catálogo completo de categorías con K=3.",
+  "repurchase_method": "Target binario gasto futuro>0. Clasificadores independientes y tasa train. No es cabeza adicional de la red ni probabilidad causal de responder a publicidad.",
+  "sparse_products_method": "Estratos según número de pares cliente-producto train. Se restringen positivos de evaluación al estrato, manteniendo candidatos de catálogo completo. No mide productos completamente desconocidos."
+}
