@@ -12,14 +12,106 @@ import streamlit as st
 from cliente360 import runtime,business as biz
 from cliente360.settings import ART,REPORT,OUT
 
-st.set_page_config(page_title='Cliente 360 | Decisiones de marketing',page_icon='◉',layout='wide')
-st.markdown('''<style>
-.block-container {max-width:1440px;padding-top:2rem;padding-bottom:3rem}
-[data-testid="stMetric"] {border:1px solid rgba(128,128,128,.25);border-radius:12px;padding:16px}
-[data-testid="stMetricValue"] {font-size:1.65rem}
-[data-testid="stSidebar"] {border-right:1px solid rgba(128,128,128,.2)}
-[data-testid="stCaptionContainer"] {line-height:1.55}
-</style>''',unsafe_allow_html=True)
+
+FAVICON = Path(__file__).resolve().parent / "favicon.ico"
+
+st.set_page_config(
+    page_title="Cliente 360 | Decisiones de marketing",
+    page_icon=str(FAVICON),
+    layout="wide",
+)
+st.markdown("""
+<style>
+.block-container {
+    max-width: 1440px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
+h1 {
+    color: #315B88;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+}
+
+h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+[data-testid="stMetric"] {
+    background: #DDEBFF;
+    border: 1px solid #C3D9F5;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: none;
+}
+
+[data-testid="stHorizontalBlock"]
+> [data-testid="stColumn"]:nth-child(4n+2)
+[data-testid="stMetric"] {
+    background: #EAE3FC;
+    border-color: #D7CAF2;
+}
+
+[data-testid="stHorizontalBlock"]
+> [data-testid="stColumn"]:nth-child(4n+3)
+[data-testid="stMetric"] {
+    background: #DCF2EA;
+    border-color: #BFE2D5;
+}
+
+[data-testid="stHorizontalBlock"]
+> [data-testid="stColumn"]:nth-child(4n+4)
+[data-testid="stMetric"] {
+    background: #FCE7DA;
+    border-color: #F0D0BD;
+}
+
+[data-testid="stMetricValue"] {
+    color: #293D58;
+    font-size: 1.8rem;
+    font-weight: 650;
+}
+
+[data-testid="stSidebar"] {
+    border-right: 1px solid #C3D9F5;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #C9DCF2;
+    border-radius: 14px;
+    box-shadow: none;
+}
+
+[data-testid="stButton"] button,
+[data-testid="stDownloadButton"] button {
+    background: #D0E3FF;
+    color: #294D78;
+    border: 1px solid #AFCDF3;
+    border-radius: 10px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+[data-testid="stButton"] button:hover,
+[data-testid="stDownloadButton"] button:hover {
+    background: #BED8FC;
+    color: #203F65;
+    border-color: #7FAAE1;
+}
+
+[data-testid="stButton"] button:focus-visible,
+[data-testid="stDownloadButton"] button:focus-visible {
+    outline: 2px solid #5B91D6;
+    outline-offset: 3px;
+}
+
+[data-testid="stCaptionContainer"] {
+    line-height: 1.55;
+}
+</style>
+""", unsafe_allow_html=True)
 API=os.environ.get('API_URL','').rstrip('/')
 @st.cache_data(ttl=120,show_spinner=False)
 def query(kind,source,customer_id='',k=10,exclude_seen=False):
@@ -31,7 +123,15 @@ def query(kind,source,customer_id='',k=10,exclude_seen=False):
     if kind=='history':return runtime.history(customer_id,source)
     return getattr(runtime,kind)(source)
 
-PALETTE=['#0B6E75','#4F46A5','#C46A14','#2876B8','#AA4768','#527D36','#75604A']
+PALETTE = [
+    "#82B1EF",  # Azul cielo
+    "#AE99DF",  # Lavanda
+    "#80C8B1",  # Menta
+    "#EAAF91",  # Melocotón
+    "#DF9FBC",  # Rosa
+    "#80C5D7",  # Aguamarina
+    "#DCC17E",  # Amarillo mantequilla
+]
 MODEL_NAMES={'multi':'Red conjunta · herramienta','clv_only':'Red especializada en gasto','rec_only':'Red especializada en recomendación','Media':'Referencia: gasto medio','Regresion lineal':'Regresión lineal','Random Forest':'Bosque aleatorio','Gradient Boosting':'Árboles potenciados','Popularidad':'Productos populares','SVD':'Filtrado colaborativo (SVD)'}
 
 def chart(fig):
