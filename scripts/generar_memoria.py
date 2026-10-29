@@ -23,7 +23,7 @@ for name,frame,column,title,label in [
 ]:
     fig,ax=plt.subplots(figsize=(9,4));ax.bar(frame.model,frame[column]);ax.set_ylabel(label);ax.set_title(title);ax.tick_params(axis='x',rotation=20);fig.tight_layout();fig.savefig(REPORT/f'{name}.png',dpi=140);plt.close(fig)
 main=clv[clv.model=='multi'].iloc[0];best=clv.sort_values('RMSE').iloc[0];bestrec=rec.sort_values('NDCG@10',ascending=False).iloc[0]
-text=f'''# Cliente 360 · Memoria de resultados
+text=f'''# 360 Analytics · Memoria de resultados
 
 ## Resumen y procedencia
 

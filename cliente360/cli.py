@@ -2,7 +2,7 @@ import argparse
 from . import synthetic,data,train,evaluate,segmentation
 
 def main():
-    p=argparse.ArgumentParser(description='Cliente 360: laboratorio semisintetico')
+    p=argparse.ArgumentParser(description='360 Analytics: laboratorio semisintetico')
     p.add_argument('command',choices=['all','generate','prepare','train','evaluate','segment','experiments','extended'])
     p.add_argument('--source',choices=['synthetic','original'],default='synthetic');p.add_argument('--backend',choices=['numpy','torch'],default='numpy');p.add_argument('--epochs',type=int,default=160);p.add_argument('--customers',type=int,default=2500)
     a=p.parse_args()

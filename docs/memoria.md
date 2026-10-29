@@ -1,4 +1,4 @@
-# Cliente 360 · Memoria de resultados
+# 360 Analytics · Memoria de resultados
 
 ## Resumen y procedencia
 

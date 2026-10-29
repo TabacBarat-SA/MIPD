@@ -1,4 +1,4 @@
-# Cliente 360 · Decisiones de marketing
+# 360 Analytics · Decisiones de marketing
 
 Herramienta académica de Marketing Digital y Publicidad Interactiva para responder tres preguntas: **a quién prestar atención, qué productos ofrecer y cómo comprobar la propuesta**. Integra previsión de gasto a tres meses, recomendaciones y grupos de clientes.
 
@@ -11,7 +11,7 @@ Herramienta académica de Marketing Digital y Publicidad Interactiva para respon
 - Para conservar tu entrenamiento: utiliza `Cliente360_actualizacion_v2.zip`. Extrae su contenido directamente en la raíz actual, donde está `pyproject.toml`, y acepta sustituir el código. El parche no contiene `data/`, `artifacts/` ni `reports/`.
 - Para empezar en una carpeta nueva: utiliza `Cliente360_completo_v2.zip`. Incluye los datos y pesos de demostración originales, cuyo motor registrado es NumPy. No se presentan como pesos entrenados con CUDA.
 - El código de PyTorch/CUDA y el nuevo `pyproject.toml` **ya están modificados** en ambos paquetes. No hace falta copiar manualmente la clase del README antiguo.
-- Copia también la carpeta oculta **`.streamlit/`**. Contiene el tema que corrige el contraste. Detén Streamlit antes de actualizar y arráncalo de nuevo desde la raíz.
+- La interfaz es ahora una aplicación web (carpeta `web/`). Consulta el apartado 3 para compilarla y abrirla. Ya no se usa Streamlit.
 
 Después de aplicar el parche, ejecuta:
 
@@ -20,7 +20,7 @@ uv sync
 uv run python -m cliente360.cli extended
 uv run python -m cliente360.cli extended --source original
 uv run python scripts/generar_memoria.py
-uv run streamlit run app/dashboard.py
+uv run uvicorn services.web:app --port 8501
 ```
 
 Los experimentos `extended` calculan informes adicionales sobre tus pesos actuales. No reentrenan ni cambian la red principal. Si has cambiado pesos y todavía no has recalculado `evaluate` y `segment`, sigue antes la secuencia completa del apartado 4.
@@ -32,7 +32,7 @@ Los experimentos `extended` calculan informes adicionales sobre tus pesos actual
 - Carpeta completa del proyecto o parche aplicado sobre una copia completa.
 - Internet para instalar dependencias.
 - Python 3.12, que puede instalar uv.
-- GPU NVIDIA solo si quieres aceleración CUDA. No hace falta GPU para abrir el panel.
+- GPU NVIDIA solo si quieres aceleración CUDA. No hace falta GPU para abrir la web.
 
 ### Windows: instalar uv
 
@@ -54,7 +54,7 @@ uv se instala en el ordenador, no como una carpeta del proyecto. **No ejecutes `
 
 ### Abrir la carpeta correcta
 
-Abre una terminal en la carpeta donde están `pyproject.toml`, `README.md`, `app/`, `.streamlit/` y `cliente360/`. No dentro de la subcarpeta que contiene los módulos Python.
+Abre una terminal en la carpeta donde están `pyproject.toml`, `README.md`, `web/` y `cliente360/`. No dentro de la subcarpeta que contiene los módulos Python.
 
 ```bash
 uv python install 3.12
@@ -65,25 +65,31 @@ Si el equipo ya comparte un `uv.lock` actualizado, utiliza `uv sync --locked`. N
 
 uv crea `.venv`. No hace falta activarlo ni instalar paquetes manualmente con pip. Todos los comandos de esta guía se ejecutan desde la raíz con `uv run`.
 
-## 3. Abrir el panel sin entrenar
+## 3. Abrir la web sin entrenar
+
+La interfaz de 360 Analytics es una aplicación React (Vite, Tailwind, Motion y Recharts) que consulta una API FastAPI (`services/web.py`) con los resultados guardados. Necesitas Node 20 o superior para compilarla.
 
 ```bash
-uv run streamlit run app/dashboard.py
+cd web
+npm install
+npm run build
+cd ..
+uv run uvicorn services.web:app --port 8501
 ```
 
-Abre el [panel local](http://localhost:8501). Detén el servidor con `Ctrl+C`.
+Abre la [web local](http://localhost:8501). Detén el servidor con `Ctrl+C`.
+
+Para desarrollar con recarga en caliente, deja la API en marcha y, en otra terminal, ejecuta `npm run dev` dentro de `web/` (usa http://localhost:5173 y redirige `/api` al puerto 8501).
 
 Los pesos y resultados guardados permiten usar la aplicación sin reentrenar. **No ejecutes `all` para limitarte a abrir la demo.**
 
-### Si el texto se ve blanco sobre fondo claro
+### Moneda
 
-1. Detén Streamlit.
-2. Comprueba que `.streamlit/config.toml` está en la raíz y que has actualizado `app/dashboard.py`.
-3. Arranca de nuevo desde esa raíz.
-4. En los ajustes de Streamlit selecciona el tema personalizado (`Custom Theme`) si habías guardado otra preferencia.
-5. Recarga la página. Si el puerto está ocupado, detén el servidor anterior o utiliza `--server.port 8502`.
+Los datos están en reales (BRL). La web los muestra en dólares con el tipo de cambio actual (`forex-python`, se consulta como máximo una vez por hora) y permite alternar a BRL desde el menú lateral. Sin conexión o sin tipo de cambio disponible se muestran reales.
 
-El nuevo panel no fuerza un fondo claro dejando el texto del tema oscuro. Los controles, avisos y tablas utilizan el tema nativo. No se necesita una extensión de navegador para corregirlo.
+### Tema claro y oscuro
+
+La web respeta la preferencia del sistema y recuerda la elección del botón de tema. Los textos de las tablas, gráficos y avisos usan variables de color que cambian con el tema, así que no hay texto claro sobre fondo claro.
 
 ## 4. Entrenar con PyTorch y CUDA
 
@@ -102,16 +108,16 @@ uv run python scripts/comprobar_entorno.py
 
 Para CUDA, la comprobación debe indicar `CUDA disponible: True`, identificar la GPU y completar una suma de tensores en GPU. Que funcione `nvidia-smi` por sí solo no demuestra que PyTorch esté utilizando CUDA.
 
-### Entrenar y actualizar el panel
+### Entrenar y actualizar la web
 
-Detén el panel y guarda una copia de `artifacts/`, `reports/` y `data/processed/` si quieres conservar la ejecución anterior. Ejecuta uno por uno, continuando solo si el anterior termina sin errores:
+Detén el servidor web y guarda una copia de `artifacts/`, `reports/` y `data/processed/` si quieres conservar la ejecución anterior. Ejecuta uno por uno, continuando solo si el anterior termina sin errores:
 
 ```bash
 uv run python -m cliente360.cli train --backend torch --epochs 100
 uv run python -m cliente360.cli evaluate
 uv run python -m cliente360.cli segment
 uv run python -m cliente360.cli extended
-uv run streamlit run app/dashboard.py
+uv run uvicorn services.web:app --port 8501
 ```
 
 Al comenzar, el entrenador muestra `PyTorch | dispositivo: cuda:0` o `cpu`. El registro `artifacts/synthetic_training.json` conserva backend y dispositivo para los nuevos entrenamientos.
@@ -222,11 +228,11 @@ La versión por categoría promedia logits de productos; no entrena otra red. La
 
 ## 7. Compartir el proyecto y conservar resultados
 
-Comparte código, `.streamlit/`, `pyproject.toml`, `.python-version`, el lock válido cuando exista, datos, artefactos e informes de la misma ejecución. No compartas `.venv/`.
+Comparte código, `web/` (sin `node_modules/` ni `dist/`), `pyproject.toml`, `.python-version`, el lock válido cuando exista, datos, artefactos e informes de la misma ejecución. No compartas `.venv/`.
 
 **El `.gitignore` inicial excluye `data/` y `artifacts/`.** Clonar solo el repositorio no garantiza recibir los datos o pesos. Distribuye esos directorios mediante el paquete completo o un mecanismo acordado.
 
-El parche v2 conserva tus pesos porque no los incluye. Tras aplicarlo, recalcula `extended` con tus pesos. Si vuelves a entrenar, recalcula también `evaluate` y `segment`. Reinicia panel y servicios para vaciar cachés; el botón «Actualizar datos del panel» limpia las cachés locales, no las de procesos REST remotos.
+El parche v2 conserva tus pesos porque no los incluye. Tras aplicarlo, recalcula `extended` con tus pesos. Si vuelves a entrenar, recalcula también `evaluate` y `segment`. Reinicia el servidor y los servicios para vaciar cachés; el botón «Actualizar datos» de la web limpia la caché del navegador, no las de procesos REST remotos.
 
 ## 8. Pruebas, memoria y presentación
 
@@ -252,11 +258,11 @@ La memoria y el guion están en Markdown. No se incluye una presentación PowerP
 docker compose up --build
 ```
 
-[Panel](http://localhost:8501) · [Pasarela](http://localhost:8000/health)
+[Web](http://localhost:8501) · [Pasarela](http://localhost:8000/health)
 
-Cinco servicios: datos (8001 interno), modelo (8002), segmentación (8003), evaluación (8004) y pasarela con panel (8000/8501). Las API consultan artefactos; el entrenamiento y los cálculos se realizan por CLI. El panel utiliza REST para las consultas principales y el volumen común para las vistas derivadas de negocio y los informes adicionales.
+Cinco servicios: datos (8001 interno), modelo (8002), segmentación (8003), evaluación (8004) y pasarela (8000) y web (8501). Las API consultan artefactos; el entrenamiento y los cálculos se realizan por CLI. El panel utiliza REST para las consultas principales y el volumen común para las vistas derivadas de negocio y los informes adicionales.
 
-Los volúmenes se montan en solo lectura. No se reentrena al arrancar. El Dockerfile copia `.streamlit/`. Compose no configura GPU para entrenamiento: la ruta CUDA descrita aquí es local.
+Los volúmenes se montan en solo lectura. No se reentrena al arrancar. El Dockerfile compila la web en una etapa Node y copia `web/dist`. Compose no configura GPU para entrenamiento: la ruta CUDA descrita aquí es local.
 
 ```bash
 docker compose down
@@ -272,7 +278,7 @@ La construcción Docker sigue sin verificarse en el entorno de preparación. No 
 - **CUDA no disponible:** ejecuta el diagnóstico con `uv run`, comprueba el índice `pytorch-cu128` y vuelve a sincronizar. No basta con usar otro Python que sí tenga CUDA.
 - **Error de VRAM:** libera memoria o usa CPU/NumPy. El entrenamiento no implementa minibatches.
 - **Faltan datos o pesos:** recupera el paquete completo o reconstruye desde los CSV originales. No crees archivos vacíos.
-- **Resultados antiguos:** recalcula informes y segmentos, reinicia servicios y actualiza el panel.
+- **Resultados antiguos:** recalcula informes y segmentos, reinicia servicios y pulsa «Actualizar datos» en la web.
 - **Sin clientes en la campaña:** amplía grupos o reduce filtros. Una audiencia vacía se muestra sin inventar clientes.
 - **Ceros en recomendación original:** revisa `eligible_users`. Cero casos significa ausencia de evaluación, no evidencia de calidad.
 - **Errores de red al instalar:** comprueba acceso a PyPI y al índice PyTorch. No desactives TLS como solución general.
@@ -292,10 +298,9 @@ Las entradas son anteriores al corte. Las etiquetas usan inicio incluido y final
 ## 12. Estructura y fuentes
 
 ```text
-.streamlit/       Tema y configuración de interfaz
-app/              Panel orientado a decisiones
+web/              Interfaz web (React + Vite + Tailwind)
 cliente360/       Datos, redes, negocio, entrenamiento y evaluación
-services/         Servicios REST y pasarela
+services/         Servicios REST, pasarela y API de la web (web.py)
 data/             Originales, ampliación y datos procesados
 artifacts/        Pesos y embeddings
 reports/          Métricas y auditoría
@@ -305,6 +310,6 @@ notebooks/        Exploración
 tests/            Pruebas de integridad, negocio y contratos
 ```
 
-Referencias: [uv y PyTorch](https://docs.astral.sh/uv/guides/integration/pytorch/), [versiones PyTorch](https://pytorch.org/get-started/previous-versions/), [temas Streamlit](https://docs.streamlit.io/develop/concepts/configuration/theming).
+Referencias: [uv y PyTorch](https://docs.astral.sh/uv/guides/integration/pytorch/), [versiones PyTorch](https://pytorch.org/get-started/previous-versions/).
 
 Fuente de datos: CSV de Brazilian E-Commerce Public Dataset by Olist aportados para el proyecto. Sus condiciones y autoría corresponden a su fuente. La ampliación se identifica en `provenance.csv`; no se asigna una licencia nueva a los originales.

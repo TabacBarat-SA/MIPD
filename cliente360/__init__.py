@@ -1,1 +1,1 @@
-"""Cliente 360: laboratorio reproducible de marketing."""
+"""360 Analytics: laboratorio reproducible de marketing."""

@@ -1,6 +1,6 @@
 from fastapi import FastAPI,HTTPException,Query
 from cliente360 import runtime
-app=FastAPI(title='Cliente360 Modelo')
+app=FastAPI(title='360 Analytics Modelo')
 @app.get('/health')
 def health():return {'status':'ok','service':'model'}
 @app.get('/customers/{customer_id}')

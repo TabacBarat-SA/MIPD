@@ -44,6 +44,11 @@ def test_extended_outputs():
 
 def test_category_translation():
     assert biz.category_name('esporte_lazer')=='Deporte y ocio'
+
+def test_money_falls_back_to_reais_without_exchange_rate(monkeypatch):
+    import forex_python.converter as fx
+    def offline(*a,**k):raise ConnectionError('sin red')
+    monkeypatch.setattr(fx.CurrencyRates,'convert',offline)
     assert biz.money(1234.5)=='R$ 1.234,50'
 
 def test_historical_category_shares():

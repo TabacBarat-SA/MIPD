@@ -236,3 +236,7 @@ __pycache__/
 .streamlit/secrets.toml
 respaldo*/
 *.log
+
+# Web (360 Analytics)
+node_modules/
+web/dist/

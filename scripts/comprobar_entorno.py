@@ -3,7 +3,7 @@ from pathlib import Path
 import sys,importlib.util
 root=Path(__file__).resolve().parents[1]
 print('Python:',sys.version.split()[0]);print('Proyecto:',root)
-for relative in ['.streamlit/config.toml','data/processed/synthetic.npz','artifacts/synthetic_multi.npz','reports/synthetic_neural_clv.csv']:
+for relative in ['web/package.json','data/processed/synthetic.npz','artifacts/synthetic_multi.npz','reports/synthetic_neural_clv.csv']:
     print(('OK ' if (root/relative).exists() else 'FALTA ')+relative)
 if importlib.util.find_spec('torch') is None:
     print('PyTorch no instalado en este interprete. Usa uv sync y ejecuta con uv run.');sys.exit(1)

@@ -20,10 +20,13 @@ def category_name(value):
     return CATEGORY_ES.get(str(value),str(value).replace('_',' ').capitalize()+' (categoría original)')
 
 def money(value):
-    from forex_python.converter import CurrencyRates
-    c = CurrencyRates()
-    value = c.convert(base_cur='BRL', dest_cur='USD', amount=value)
-    return ('$'+f'{float(value):,.2f}').replace(',','X').replace('.',',').replace('X','.')
+    try:
+        from forex_python.converter import CurrencyRates
+        value = CurrencyRates().convert(base_cur='BRL', dest_cur='USD', amount=value)
+        symbol = '$'
+    except Exception:
+        symbol = 'R$ '  # sin tipo de cambio disponible se muestran reales
+    return (symbol+f'{float(value):,.2f}').replace(',','X').replace('.',',').replace('X','.')
 
 def number(value):return f'{int(value):,}'.replace(',','.')
 

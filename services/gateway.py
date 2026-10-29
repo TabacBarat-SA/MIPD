@@ -1,7 +1,7 @@
 import os
 import httpx
 from fastapi import FastAPI,Request,HTTPException
-app=FastAPI(title='Cliente360 Pasarela')
+app=FastAPI(title='360 Analytics Pasarela')
 TARGETS={'summary':('DATA_URL','http://data:8001'),'customers':('DATA_URL','http://data:8001'),'history':('DATA_URL','http://data:8001'),'segments':('SEGMENTATION_URL','http://segmentation:8003'),'evaluation':('EVALUATION_URL','http://evaluation:8004')}
 @app.get('/health')
 def health():return {'status':'ok','service':'gateway'}

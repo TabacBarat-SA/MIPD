@@ -1,6 +1,6 @@
 from fastapi import FastAPI,Query
 from cliente360 import runtime
-app=FastAPI(title='Cliente360 Datos')
+app=FastAPI(title='360 Analytics Datos')
 @app.get('/health')
 def health():return {'status':'ok','service':'data'}
 @app.get('/summary')
