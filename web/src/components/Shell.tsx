@@ -121,12 +121,10 @@ export default function Shell({ children }: { children: ReactNode }) {
 
       <main className="relative min-w-0 overflow-hidden">
         <div className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-[520px]" aria-hidden />
-        <AnimatePresence mode="wait">
-          <motion.div key={pathname} className="relative mx-auto max-w-[1180px] px-4 pb-24 pt-10 sm:px-8 lg:pt-14"
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
-            {children}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div key={pathname} className="relative mx-auto max-w-[1180px] px-4 pb-24 pt-10 sm:px-8 lg:pt-14"
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+          {children}
+        </motion.div>
       </main>
     </div>
   )
