@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>360 Analytics · Informe del proyecto</title>
+<style>
+:root{
+  --bg:#0b1020;--surface:#141b33;--raised:#1b2444;--line:#2a3560;--text:#eef1ff;--muted:#a8b2d8;
+  --accent:#7c8cff;--g1:#ff6b8b;--g2:#ffb454;--g3:#4be3b0;--g4:#5cc8ff;--g5:#b48cff;--g6:#ffe066;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f5f6fc;--surface:#fff;--raised:#eef0fb;--line:#d9ddf2;--text:#161a33;--muted:#515b86;--accent:#4a5be0}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:17px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+section{padding:56px 0;border-top:1px solid var(--line)}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);line-height:1.05;margin:0 0 16px;letter-spacing:-.02em}
+h2{font-size:clamp(1.7rem,3.5vw,2.4rem);margin:0 0 8px;letter-spacing:-.01em}
+h3{margin:0 0 6px;font-size:1.15rem}
+p{margin:0 0 14px}
+.muted{color:var(--muted)}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.78rem;margin-bottom:10px}
+.hero{padding:90px 0 70px;background:radial-gradient(900px 400px at 15% -10%,rgba(124,140,255,.35),transparent),radial-gradient(700px 400px at 95% 10%,rgba(255,107,139,.25),transparent)}
+.grad{background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3),var(--g4),var(--g5));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:1.25rem;color:var(--muted);max-width:720px}
+.pill{display:inline-block;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 14px;font-size:.85rem;margin:14px 8px 0 0;color:var(--muted)}
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:24px}
+.card .ico{font-size:2rem;margin-bottom:6px}
+.stat{font-size:2.6rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+.stat small{display:block;font-size:.9rem;font-weight:500;color:var(--muted);margin-top:8px;letter-spacing:0}
+.q{border-left:4px solid var(--accent);padding:4px 0 4px 18px;font-size:1.15rem;margin:10px 0}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:24px 0}
+.step{flex:1 1 150px;background:var(--raised);border:1px solid var(--line);border-radius:18px;padding:16px;text-align:center}
+.step b{display:block;margin:4px 0}
+.arrow{align-self:center;color:var(--accent);font-size:1.6rem}
+.gcard{border-top:5px solid var(--c)}
+.gcard .n{color:var(--c);font-weight:800;font-size:2rem}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--c);color:#0b1020;margin-bottom:8px}
+.bars{display:grid;gap:12px;margin-top:18px}
+.bar{display:grid;grid-template-columns:150px 1fr 70px;gap:12px;align-items:center;font-size:.95rem}
+.track{height:22px;border-radius:999px;background:var(--raised);overflow:hidden}
+.fill{height:100%;border-radius:999px;background:var(--c);width:var(--w)}
+.bar span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+dl{margin:0}dt{font-weight:700;margin-top:10px}dd{margin:2px 0 0;color:var(--muted)}
+.page{display:grid;grid-template-columns:48px 1fr;gap:16px}
+.page .num{width:48px;height:48px;border-radius:14px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:1.2rem}
+.note{background:var(--raised);border:1px dashed var(--line);border-radius:18px;padding:18px 22px;margin-top:20px}
+.warn{border-color:var(--g2)}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:600}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.best{color:var(--g3);font-weight:700}
+.no{color:var(--g1)}.yes{color:var(--g3)}
+ul{padding-left:20px;margin:6px 0}
+li{margin:5px 0}
+footer{padding:40px 0;color:var(--muted);font-size:.9rem;border-top:1px solid var(--line)}
+@media (max-width:600px){.bar{grid-template-columns:110px 1fr 56px}.arrow{display:none}}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--raised:#f1f2fa;--line:#d0d4ee;--text:#111;--muted:#444}
+  body{font-size:14px}section{padding:28px 0}.card,.step{break-inside:avoid}
+  .hero{background:none;padding:30px 0}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+<div class="wrap">
+  <div class="kicker">Marketing Digital y Publicidad Interactiva · Informe del proyecto</div>
+  <h1><span class="grad">360 Analytics</span><br>Decisiones de marketing</h1>
+  <p class="lead">Una herramienta que convierte el historial de compras de una tienda online en tres respuestas útiles para marketing: <b>a quién prestar atención</b>, <b>qué productos ofrecer</b> y <b>cómo comprobar la propuesta</b>.</p>
+  <span class="pill">Datos de la tienda Olist (Brasil)</span>
+  <span class="pill">2.500 clientes</span>
+  <span class="pill">300 productos</span>
+  <span class="pill">Demostración académica</span>
+</div>
+</header>
+
+<section>
+<div class="wrap">
+  <div class="kicker">1 · La idea</div>
+  <h2>¿Qué problema resuelve?</h2>
+  <p class="lead">Una empresa tiene miles de clientes y un presupuesto limitado. No puede enviar el mismo mensaje a todos. Necesita saber <b>quién merece más atención</b>, <b>qué enseñarle</b> y <b>si la idea funciona</b>.</p>
+  <div class="grid g3" style="margin-top:26px">
+    <div class="card"><div class="ico">💶</div><h3>¿A quién prestar atención?</h3><p class="muted">Calculamos cuánto se prevé que gaste cada cliente en los próximos 3 meses y ordenamos por ese gasto previsto.</p></div>
+    <div class="card"><div class="ico">🛍️</div><h3>¿Qué productos ofrecer?</h3><p class="muted">Para cada cliente se propone una selección de productos afines a lo que ya compró, como hace una tienda online al mostrar «te puede interesar».</p></div>
+    <div class="card"><div class="ico">🧪</div><h3>¿Cómo comprobarlo?</h3><p class="muted">Cada grupo trae una acción a probar y un indicador para medir. La herramienta propone experimentos; no los ejecuta.</p></div>
+  </div>
+  <div class="note warn"><b>Importante:</b> es una demostración con datos históricos. No envía mensajes, no publica anuncios y no demuestra ventas, rentabilidad (ROI) ni eficacia publicitaria real.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">2 · Los datos</div>
+  <h2>¿De dónde sale la información?</h2>
+  <p class="muted">Se parte de Olist, una tienda online brasileña con datos públicos de pedidos. Como la mayoría de sus clientes compra una sola vez, hay muy poca recompra que estudiar. Por eso se añadieron compras <b>artificiales, claramente identificadas</b>, que simulan clientes que vuelven a comprar.</p>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="card"><div class="stat" style="color:var(--g4)">99.441<small>pedidos reales de Olist</small></div></div>
+    <div class="card"><div class="stat" style="color:var(--g2)">30.936<small>pedidos artificiales añadidos</small></div></div>
+    <div class="card"><div class="stat" style="color:var(--g3)">2.500<small>clientes en el estudio</small></div></div>
+    <div class="card"><div class="stat" style="color:var(--g5)">300<small>productos (10 categorías, 30 de cada una)</small></div></div>
+    <div class="card"><div class="stat" style="color:var(--g1)">3 meses<small>horizonte de la previsión de gasto</small></div></div>
+    <div class="card"><div class="stat" style="color:var(--g6)">BRL<small>moneda base, con opción de cambiarla en la app</small></div></div>
+  </div>
+  <div class="note"><b>¿Por qué no basta con copiar pedidos?</b> Copiar filas crearía duplicados, no clientes que de verdad repiten. Cada compra artificial es un pedido nuevo con fechas, pagos y productos coherentes, y está marcada como sintética para que nunca se confunda con una venta real.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">3 · El cerebro</div>
+  <h2>Cómo funciona, sin fórmulas</h2>
+  <p class="muted">Un único «cerebro» (una red neuronal) lee el historial de cada cliente y lo resume en una especie de <b>ficha de personalidad de compra</b>. Con esa misma ficha se toman tres decisiones.</p>
+  <div class="flow">
+    <div class="step"><div class="ico">🧾</div><b>Historial</b><span class="muted">qué compró, cuándo y cuánto</span></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="ico">🧠</div><b>Ficha del cliente</b><span class="muted">resumen aprendido por la red</span></div>
+    <div class="arrow">→</div>
+    <div class="step" style="border-color:var(--g3)"><div class="ico">💶</div><b>Gasto previsto</b><span class="muted">próximos 3 meses</span></div>
+    <div class="step" style="border-color:var(--g4)"><div class="ico">🛍️</div><b>Productos afines</b><span class="muted">ranking por cliente</span></div>
+    <div class="step" style="border-color:var(--g1)"><div class="ico">👥</div><b>Grupos</b><span class="muted">clientes parecidos juntos</span></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Para evitar trampas</h3><p class="muted">El sistema solo usa información <b>anterior</b> a la fecha de corte para predecir lo que ocurre <b>después</b>. Se entrena con unos periodos, se ajusta con otros y se evalúa con uno que nunca vio (abril–junio de 2018).</p></div>
+    <div class="card"><h3>Qué no hace</h3><p class="muted">No conoce a clientes nuevos que no estén en el historial. No calcula probabilidades de compra reales ni predice abandono: las puntuaciones solo sirven para <b>ordenar</b>.</p></div>
+  </div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">4 · Los grupos</div>
+  <h2>¿Qué son los grupos G1 a G6?</h2>
+  <p class="lead">Un <b>grupo</b> (o segmento) es un conjunto de clientes que se parecen en su forma de comprar. En lugar de tratar a 2.500 personas una a una, se trabaja con 6 perfiles y se diseña un mensaje distinto para cada uno.</p>
+  <p class="muted">Los grupos los descubre el sistema automáticamente al juntar clientes con «fichas» parecidas. Después se les pone un <b>nombre comercial</b> con una regla simple, según cuánto se prevé que gasten y cuántos días llevan sin comprar.</p>
+
+  <div class="grid g3" style="margin:22px 0">
+    <div class="card gcard" style="--c:var(--g3)"><span class="tag">Fidelización prioritaria</span><p class="muted">Gasto previsto alto y compraron hace poco. Son los clientes valiosos y activos: conviene cuidarlos.</p></div>
+    <div class="card gcard" style="--c:var(--g2)"><span class="tag">Reactivación</span><p class="muted">Llevan más tiempo sin comprar. Hay que recordarles que existes antes de regalarles descuentos.</p></div>
+    <div class="card gcard" style="--c:var(--g4)"><span class="tag">Desarrollo de relación</span><p class="muted">Zona intermedia: compran con normalidad y se les puede ofrecer más categorías (venta cruzada). En esta demostración ningún grupo cae aquí.</p></div>
+  </div>
+
+  <h3 style="margin-top:34px">Tamaño de cada grupo</h3>
+  <div class="bars">
+    <div class="bar" style="--c:var(--g3)"><span>G3 · Fidelización</span><div class="track"><div class="fill" style="--w:32.4%"></div></div><span>809</span></div>
+    <div class="bar" style="--c:var(--g2)"><span>G2 · Reactivación</span><div class="track"><div class="fill" style="--w:32.3%"></div></div><span>807</span></div>
+    <div class="bar" style="--c:var(--g5)"><span>G4 · Reactivación</span><div class="track"><div class="fill" style="--w:11.1%"></div></div><span>278</span></div>
+    <div class="bar" style="--c:var(--g1)"><span>G1 · Reactivación</span><div class="track"><div class="fill" style="--w:8.4%"></div></div><span>211</span></div>
+    <div class="bar" style="--c:var(--g6)"><span>G6 · Reactivación</span><div class="track"><div class="fill" style="--w:8%"></div></div><span>199</span></div>
+    <div class="bar" style="--c:var(--g4)"><span>G5 · Reactivación</span><div class="track"><div class="fill" style="--w:7.8%"></div></div><span>196</span></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:28px">
+    <div class="card gcard" style="--c:var(--g3)">
+      <div class="n">G3</div><h3>Fidelización prioritaria</h3>
+      <p class="muted">809 clientes · el grupo más valioso</p>
+      <dl>
+        <dt>Qué observamos</dt><dd>Muy activos: unos 18 pedidos previos y solo 34 días desde su última compra. Gasto previsto medio ≈ 1.141 BRL, el más alto.</dd>
+        <dt>Categorías favoritas</dt><dd>Belleza y cuidado personal (16%), Deporte y ocio (14%), Muebles y decoración (14%): gustos variados.</dd>
+        <dt>Qué probar</dt><dd>Una selección de productos complementarios, sin descuento generalizado.</dd>
+        <dt>Canal e indicador</dt><dd>Email personalizado o área privada · Recompra a 90 días y margen por pedido.</dd>
+      </dl>
+    </div>
+    <div class="card gcard" style="--c:var(--g2)">
+      <div class="n">G2</div><h3>Reactivación</h3>
+      <p class="muted">807 clientes · el grupo «dormido» más grande</p>
+      <dl>
+        <dt>Qué observamos</dt><dd>Unos 6 pedidos previos y 127 días sin comprar. Gasto previsto medio ≈ 314 BRL, el más bajo.</dd>
+        <dt>Categorías favoritas</dt><dd>Muebles y decoración (36%), Deporte y ocio (16%), Herramientas y jardín (12%).</dd>
+        <dt>Qué probar</dt><dd>Un recordatorio de novedades y preferencias antes de ofrecer un incentivo.</dd>
+        <dt>Canal e indicador</dt><dd>Email con permiso de contacto · Recompra a 90 días y bajas de suscripción.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <h3 style="margin-top:34px">Los cuatro grupos «de nicho» (G1, G4, G5, G6)</h3>
+  <p class="muted">Son grupos pequeños y muy marcados: casi el 80% de lo que compran pertenece a <b>una sola categoría</b>. Todos reciben la misma estrategia de reactivación.</p>
+  <div class="grid g2">
+    <div class="card gcard" style="--c:var(--g1)"><div class="n">G1</div><b>211 clientes</b><p class="muted">Aficionados a la <b>informática y accesorios</b> (79%). Gasto previsto ≈ 524 BRL.</p></div>
+    <div class="card gcard" style="--c:var(--g5)"><div class="n">G4</div><b>278 clientes</b><p class="muted">Aficionados al <b>hogar y textiles</b> (78%). Gasto previsto ≈ 494 BRL.</p></div>
+    <div class="card gcard" style="--c:var(--g4)"><div class="n">G5</div><b>196 clientes</b><p class="muted">Aficionados a <b>artículos para el hogar</b> (79%). Gasto previsto ≈ 512 BRL.</p></div>
+    <div class="card gcard" style="--c:var(--g6)"><div class="n">G6</div><b>199 clientes</b><p class="muted">Aficionados a la <b>telefonía</b> (79%). Gasto previsto ≈ 429 BRL.</p></div>
+  </div>
+  <div class="note warn"><b>Matiz:</b> los nombres como «Fidelización» o «Reactivación» son <b>descripciones</b> basadas en gasto y días sin comprar. No significan que el sistema haya demostrado que un grupo vaya a ser fiel o a abandonar.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">5 · La aplicación</div>
+  <h2>Un recorrido por cada pantalla</h2>
+  <p class="muted">La herramienta es una web con siete apartados. Se pueden ver en este orden durante una demostración.</p>
+  <div class="grid" style="margin-top:22px">
+    <div class="card page"><div class="num">1</div><div><h3>Resumen del negocio</h3><p class="muted">La portada. Muestra la foto general: número de clientes, gasto previsto total, escenario y fecha de corte. Aquí se deja claro que el gasto es una <b>estimación</b>, no ventas garantizadas.</p></div></div>
+    <div class="card page"><div class="num">2</div><div><h3>Entender los grupos</h3><p class="muted">Un mapa de puntos de colores en el que cada punto es un cliente; los clientes parecidos quedan cerca. Al elegir un grupo se ve qué observamos, sus categorías favoritas, qué acción probar y qué medir.</p></div></div>
+    <div class="card page"><div class="num">3</div><div><h3>Conocer a un cliente</h3><p class="muted">La ficha individual: historial de compras, gasto previsto y los productos recomendados. Los clientes llevan alias para facilitar la lectura; no son nombres reales.</p></div></div>
+    <div class="card page"><div class="num">4</div><div><h3>Preparar una campaña</h3><p class="muted">Se elige objetivo, grupos, filtros y tamaño de la audiencia, y se indica un coste supuesto por contacto. Se descarga una lista de prueba con identificadores anonimizados: sin emails ni permisos. No envía nada.</p></div></div>
+    <div class="card page"><div class="num">5</div><div><h3>Comprobar los resultados</h3><p class="muted">Compara la red con alternativas más sencillas para ver si la complejidad está justificada. Incluye también los casos en que la red <b>no</b> gana.</p></div></div>
+    <div class="card page"><div class="num">6</div><div><h3>Cómo funciona</h3><p class="muted">Explica con esquemas cómo un mismo historial alimenta las tres decisiones, para quien quiera entender el motor.</p></div></div>
+    <div class="card page"><div class="num">7</div><div><h3>Guía de uso</h3><p class="muted">Un manual para una persona de marketing sin conocimientos técnicos: qué hacer paso a paso y qué frases evitar.</p></div></div>
+  </div>
+  <div class="note">Extras de la interfaz: <b>cambio de moneda</b>, <b>tema claro/oscuro</b> y botón para <b>actualizar datos</b>.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">6 · Los resultados</div>
+  <h2>¿Funciona mejor que lo sencillo?</h2>
+  <p class="lead">Se comparó la red con métodos clásicos. El resultado es honesto: <b>la complejidad no siempre gana</b>.</p>
+
+  <div class="grid g2" style="margin-top:22px">
+    <div class="card">
+      <h3>Previsión de gasto <span class="muted" style="font-weight:400">(error en BRL: menos es mejor)</span></h3>
+      <table>
+        <tr><th>Método</th><th class="r">Error</th></tr>
+        <tr><td class="best">Red solo gasto</td><td class="r best">482</td></tr>
+        <tr><td>Media simple</td><td class="r">557</td></tr>
+        <tr><td>Red conjunta (3 en 1)</td><td class="r">589</td></tr>
+        <tr><td>Regresión lineal</td><td class="r">617</td></tr>
+        <tr><td>Gradient Boosting</td><td class="r">622</td></tr>
+        <tr><td>Random Forest</td><td class="r">676</td></tr>
+      </table>
+      <p class="muted" style="margin-top:12px">La red especializada solo en gasto gana. La red conjunta queda por detrás incluso de la media simple en error monetario, aunque ordena mejor a los clientes.</p>
+    </div>
+    <div class="card">
+      <h3>Recomendación de productos <span class="muted" style="font-weight:400">(calidad del ranking: más es mejor)</span></h3>
+      <table>
+        <tr><th>Método</th><th class="r">Calidad</th></tr>
+        <tr><td class="best">Red solo recomendación</td><td class="r best">0,256</td></tr>
+        <tr><td>SVD (clásico)</td><td class="r">0,207</td></tr>
+        <tr><td>Red conjunta (3 en 1)</td><td class="r">0,201</td></tr>
+        <tr><td>Popularidad</td><td class="r">0,052</td></tr>
+      </table>
+      <p class="muted" style="margin-top:12px">Recomendar personalizando supera con claridad a recomendar «lo más vendido». La red conjunta cubre más catálogo (75% frente a 42%) a cambio de algo menos de precisión.</p>
+    </div>
+  </div>
+  <div class="note"><b>Conclusión sencilla:</b> personalizar sirve mucho más que repetir lo popular, pero juntar todo en una sola red no es automáticamente mejor que especializarla. Mostrarlo así es parte del rigor del proyecto.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">7 · Honestidad académica</div>
+  <h2>Qué demuestra y qué no</h2>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="card"><h3 class="yes">✔ Sí demuestra</h3>
+      <ul class="muted">
+        <li>Un flujo completo de datos a decisión de marketing.</li>
+        <li>Que personalizar supera a lo genérico en recomendación.</li>
+        <li>Cómo traducir grupos de clientes en acciones y KPIs medibles.</li>
+        <li>Una evaluación sin fugas de información del futuro.</li>
+      </ul></div>
+    <div class="card"><h3 class="no">✘ No demuestra</h3>
+      <ul class="muted">
+        <li>Ventas reales, ROI ni eficacia publicitaria.</li>
+        <li>Que una campaña genere el gasto previsto (no mide efecto causal).</li>
+        <li>Que las puntuaciones sean probabilidades de compra.</li>
+        <li>Que un grupo vaya a abandonar o a ser fiel.</li>
+        <li>Comportamiento real: parte de la recompra es simulada por diseño.</li>
+      </ul></div>
+  </div>
+  <div class="note warn"><b>Datos de contacto:</b> el proyecto no contiene emails ni consentimientos de comunicación. Por eso es una demostración y no una herramienta lista para contactar clientes.</div>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">8 · Cómo se usaría</div>
+  <h2>Ejemplo de hipótesis de campaña</h2>
+  <div class="q">«Proponemos contrastar un mensaje con productos afines frente a un mensaje genérico en una audiencia válida.»</div>
+  <p class="muted">Antes de lanzar se fijaría el indicador y el periodo; durante se registraría a quién se envía, entregas, clics, compras, costes y bajas. La aplicación propone la prueba, pero no la ejecuta ni aporta sus resultados.</p>
+  <h3 style="margin-top:24px">Frases que conviene evitar al presentarlo</h3>
+  <ul class="muted">
+    <li>«La campaña generará el gasto previsto.» → El modelo no mide efecto incremental.</li>
+    <li>«Afinidad 0,2 significa 20% de compra.» → No está calibrada.</li>
+    <li>«Este grupo va a abandonar.» → No se entrenó una etiqueta de abandono.</li>
+    <li>«La red siempre es mejor.» → Las tablas muestran que no.</li>
+  </ul>
+</div>
+</section>
+
+<section>
+<div class="wrap">
+  <div class="kicker">9 · Glosario</div>
+  <h2>Palabras clave</h2>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="card"><dl>
+      <dt>CLV / gasto previsto</dt><dd>Cuánto se estima que gastará un cliente en los próximos 3 meses.</dd>
+      <dt>Segmento / grupo</dt><dd>Conjunto de clientes con hábitos de compra parecidos.</dd>
+      <dt>Recencia</dt><dd>Días desde la última compra.</dd>
+      <dt>Frecuencia</dt><dd>Número de pedidos anteriores.</dd>
+    </dl></div>
+    <div class="card"><dl>
+      <dt>Afinidad</dt><dd>Puntuación de lo bien que encaja un producto con un cliente. Sirve para ordenar, no es una probabilidad.</dd>
+      <dt>KPI</dt><dd>Indicador que se mide para saber si una acción funcionó.</dd>
+      <dt>Venta cruzada</dt><dd>Ofrecer productos de otras categorías afines a lo que ya compra.</dd>
+      <dt>Escenario semisintético</dt><dd>Datos reales de Olist más compras artificiales identificadas.</dd>
+    </dl></div>
+  </div>
+</div>
+</section>
+
+<footer>
+<div class="wrap">360 Analytics · Marketing Digital y Publicidad Interactiva · Herramienta académica. Cifras del escenario semisintético recogidas en <code>docs/memoria.md</code>. Para exportar a PDF: imprimir desde el navegador (Ctrl+P).</div>
+</footer>
+
+</body>
+</html>
