@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
 import { BookOpen, CircleDollarSign, FlaskConical, LayoutGrid, Menu, Moon, RefreshCw, Sun, Target, UserRound, Users, X, Workflow } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
@@ -73,7 +73,11 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           className={({ isActive }) => `relative flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-colors ${isActive ? 'text-text' : 'text-muted hover:text-text'}`}>
           {({ isActive }) => (
             <>
-              {isActive && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-xl bg-raised" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
+              {isActive && (
+                <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-xl bg-raised shadow-[inset_0_0_0_1px_var(--line)]" transition={{ type: 'spring', stiffness: 500, damping: 40 }}>
+                  <span className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-accent shadow-[0_0_12px_var(--accent)]" />
+                </motion.span>
+              )}
               <n.icon className={`relative size-[18px] ${isActive ? 'text-accent' : ''}`} aria-hidden />
               <span className="relative">{n.label}</span>
             </>
@@ -87,10 +91,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 export default function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
+  const { scrollYProgress } = useScroll()
+  const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.4 })
   useEffect(() => { setOpen(false); window.scrollTo({ top: 0 }) }, [pathname])
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[264px_1fr]">
+      <motion.div className="read-progress" style={{ scaleX: progress }} aria-hidden />
+      <div className="grain" aria-hidden />
       <aside className="sticky top-0 hidden h-dvh flex-col gap-8 overflow-y-auto border-r border-line bg-surface/70 p-6 backdrop-blur lg:flex">
         <div className="flex items-center gap-3">
           <Logo />
@@ -120,6 +128,7 @@ export default function Shell({ children }: { children: ReactNode }) {
       </AnimatePresence>
 
       <main className="relative min-w-0 overflow-hidden">
+        <div className="aurora pointer-events-none absolute inset-x-0 top-0 h-[640px]" aria-hidden />
         <div className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-[520px]" aria-hidden />
         <motion.div key={pathname} className="relative mx-auto max-w-[1180px] px-4 pb-24 pt-10 sm:px-8 lg:pt-14"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>

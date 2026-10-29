@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, ChevronDown, Info } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useState, type PointerEvent, type ReactNode } from 'react'
 import { useApp } from '../lib/app'
 
 export function PageHeader({ title, lead }: { title: string; lead: ReactNode }) {
   return (
     <header className="mb-10 max-w-3xl">
+      <motion.span className="mb-5 block h-1 w-14 origin-left rounded-full bg-gradient-to-r from-[var(--g1)] via-[var(--g2)] to-[var(--g4)]"
+        initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} aria-hidden />
       <h1 className="text-4xl font-semibold leading-[1.05] sm:text-5xl">{title}</h1>
       <p className="mt-4 max-w-[62ch] text-lg text-muted">{lead}</p>
     </header>
@@ -36,7 +38,7 @@ export function Caveat({ children, tone = 'note' }: { children: ReactNode; tone?
 
 export function Stat({ label, value, hint, color }: { label: string; value: ReactNode; hint?: string; color?: string }) {
   return (
-    <div className="min-w-0 border-l-2 pl-4" style={{ borderColor: color ?? 'var(--line)' }} title={hint}>
+    <div className="min-w-0 border-l-2 pl-4" style={{ borderColor: color ?? 'var(--line)', boxShadow: color ? `-14px 0 28px -22px ${color}` : undefined }} title={hint}>
       <div className="font-display text-3xl font-semibold leading-none sm:text-4xl">{value}</div>
       <div className="mt-2 text-sm text-muted">{label}</div>
       {hint && <div className="mt-1 text-xs text-muted/80">{hint}</div>}
@@ -44,8 +46,20 @@ export function Stat({ label, value, hint, color }: { label: string; value: Reac
   )
 }
 
+/** Mueve el foco luminoso del panel hacia el cursor. */
+export const trackPointer = (e: PointerEvent<HTMLElement>) => {
+  const r = e.currentTarget.getBoundingClientRect()
+  e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`)
+  e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
+}
+
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-3xl border border-line bg-surface p-5 sm:p-7 ${className}`}>{children}</section>
+  return (
+    <section onPointerMove={trackPointer}
+      className={`spot rounded-3xl border border-line bg-surface/90 p-5 shadow-[0_1px_0_0_rgb(255_255_255/0.04)_inset,0_24px_48px_-32px_rgb(0_0_0/0.5)] sm:p-7 ${className}`}>
+      {children}
+    </section>
+  )
 }
 
 export function Segmented<T extends string>({ value, onChange, options, label, full }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; full?: boolean }) {
@@ -88,9 +102,9 @@ export interface Column { key: string; label: string; align?: 'right'; render?: 
 
 export function DataTable({ columns, rows, maxHeight }: { columns: Column[]; rows: Record<string, any>[]; maxHeight?: string }) {
   return (
-    <div className="overflow-auto rounded-2xl border border-line" style={{ maxHeight }}>
+    <div className="overflow-auto rounded-2xl border border-line bg-surface/60" style={{ maxHeight }}>
       <table className="w-full min-w-max border-collapse text-sm">
-        <thead className="sticky top-0 bg-raised">
+        <thead className="sticky top-0 bg-raised/95 backdrop-blur">
           <tr>{columns.map(c => <th key={c.key} className={`px-4 py-3 font-medium text-muted ${c.align === 'right' ? 'text-right' : 'text-left'}`}>{c.label}</th>)}</tr>
         </thead>
         <tbody>

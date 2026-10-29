@@ -20,6 +20,7 @@ export default function OverviewPage() {
   const { money } = useApp()
   const { data, error } = useScenarioApi<Overview>('overview')
   const [hover, setHover] = useState<HoverPoint | null>(null)
+  const [focus, setFocus] = useState<number | null>(null)
   const onHover = useCallback((p: HoverPoint | null) => setHover(p), [])
 
   if (error) return <ErrorState message={error} />
@@ -32,7 +33,7 @@ export default function OverviewPage() {
     <div>
       <section className="relative -mx-4 mb-14 sm:-mx-8 lg:min-h-[620px]">
         <div className="absolute inset-x-0 top-0 h-[340px] lg:inset-0 lg:h-auto">
-          <Constellation points={data.points} onHover={onHover} anchor={0.7} className="size-full touch-pan-y" />
+          <Constellation points={data.points} active={focus} onHover={onHover} anchor={0.7} className="size-full touch-pan-y" />
           {hover && (
             <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl border border-line bg-raised px-3 py-2 text-sm shadow-xl" style={{ left: hover.x, top: hover.y }}>
               <div className="flex items-center gap-2 font-medium"><span className="size-2 rounded-full" style={{ background: groupColor(hover.segment) }} />{data.profiles.find(p => p.segment === hover.segment)?.name}</div>
@@ -50,13 +51,31 @@ export default function OverviewPage() {
               <Link to="/grupos" className="btn">Explorar los grupos <ArrowRight className="size-4" aria-hidden /></Link>
               <Link to="/campana" className="btn btn-ghost">Preparar una campaña</Link>
             </div>
+            <ul className="pointer-events-auto mt-8 flex flex-wrap gap-2" aria-label="Grupos de clientes: pasa el cursor para resaltarlos en el mapa">
+              {groups.map(g => {
+                const on = focus === g.segment
+                return (
+                  <li key={g.segment}>
+                    <button type="button" aria-pressed={on}
+                      onPointerEnter={() => setFocus(g.segment)} onPointerLeave={() => setFocus(null)}
+                      onFocus={() => setFocus(g.segment)} onBlur={() => setFocus(null)}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm backdrop-blur transition-all ${on ? 'border-transparent text-text' : 'border-line bg-surface/50 text-muted hover:text-text'}`}
+                      style={on ? { background: `color-mix(in oklab, ${groupColor(g.segment)} 22%, var(--surface))`, boxShadow: `0 0 22px -6px ${groupColor(g.segment)}` } : undefined}>
+                      <span className="size-2 rounded-full" style={{ background: groupColor(g.segment) }} />
+                      {g.name}
+                      <span className="num text-xs opacity-70">{pct(g.share, 0)}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
           </motion.div>
         </div>
       </section>
 
       <ScenarioNotice />
 
-      <motion.div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
+      <motion.div className="grid gap-8 rounded-3xl border border-line bg-surface/70 p-6 backdrop-blur sm:grid-cols-2 sm:p-8 lg:grid-cols-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
         <Stat label="Clientes analizados" value={<CountUp value={total} format={num} />} hint="Muestra del estudio, no todo Olist." color="var(--g1)" />
         <Stat label="Gasto previsto a 3 meses" value={<CountUp value={data.predicted_spend} format={n => money(n)} />} hint="Estimación, no ventas garantizadas." color="var(--g2)" />
         <Stat label="Productos disponibles" value={<CountUp value={data.products} format={num} />} hint="Catálogo reducido del recomendador." color="var(--g3)" />

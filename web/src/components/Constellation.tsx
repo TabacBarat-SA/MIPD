@@ -99,9 +99,28 @@ export default function Constellation({ points, active = null, onHover, orbit = 
       ctx.globalAlpha = 1
       ctx.globalCompositeOperation = 'source-over'
       if (hover >= 0 && screen[hover]) {
+        const hp = screen[hover], seg = norm[hover].p.segment, col = colors[seg % colors.length]
+        // Vecinos del mismo grupo: hilos finos hacia los puntos mas cercanos.
+        const near: { d: number; i: number }[] = []
+        for (let i = 0; i < screen.length; i++) {
+          const s = screen[i]
+          if (!s || i === hover || norm[i].p.segment !== seg) continue
+          near.push({ d: (s.x - hp.x) ** 2 + (s.y - hp.y) ** 2, i })
+        }
+        near.sort((a, b) => a.d - b.d)
+        ctx.strokeStyle = col; ctx.lineWidth = 0.8
+        for (const { i } of near.slice(0, 8)) {
+          ctx.globalAlpha = 0.45
+          ctx.beginPath(); ctx.moveTo(hp.x, hp.y); ctx.lineTo(screen[i].x, screen[i].y); ctx.stroke()
+        }
+        ctx.globalAlpha = 1
+        const glow = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, 46)
+        glow.addColorStop(0, col + '66'); glow.addColorStop(1, col + '00')
+        ctx.fillStyle = glow
+        ctx.beginPath(); ctx.arc(hp.x, hp.y, 46, 0, 6.2832); ctx.fill()
         ctx.strokeStyle = textColor
         ctx.lineWidth = 1.5
-        ctx.beginPath(); ctx.arc(screen[hover].x, screen[hover].y, 9, 0, 6.2832); ctx.stroke()
+        ctx.beginPath(); ctx.arc(hp.x, hp.y, 9, 0, 6.2832); ctx.stroke()
       }
       raf = requestAnimationFrame(frame)
     }
