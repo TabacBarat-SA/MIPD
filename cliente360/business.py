@@ -20,7 +20,10 @@ def category_name(value):
     return CATEGORY_ES.get(str(value),str(value).replace('_',' ').capitalize()+' (categoría original)')
 
 def money(value):
-    return ('R$'+f'{float(value):,.2f}').replace(',','X').replace('.',',').replace('X','.')
+    from forex_python.converter import CurrencyRates
+    c = CurrencyRates()
+    value = c.convert(base_cur='BRL', dest_cur='USD', amount=value)
+    return ('$'+f'{float(value):,.2f}').replace(',','X').replace('.',',').replace('X','.')
 
 def number(value):return f'{int(value):,}'.replace(',','.')
 

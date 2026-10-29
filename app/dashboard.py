@@ -152,11 +152,11 @@ def metric_row(values):
 def business_names(source):return biz.profiles(source).set_index('segment').name.to_dict()
 
 with st.sidebar:
-    st.title('Cliente 360')
+    st.title('360 Analytics')
     st.caption('DECISIONES DE MARKETING')
     scenario=st.selectbox('Datos que quieres explorar',['Demostración con compras simuladas','Datos originales · misma muestra'])
     source='synthetic' if scenario.startswith('Demostración') else 'original'
-    page=st.radio('¿Qué necesitas hacer?',['Resumen del negocio','Conocer a un cliente','Entender los grupos','Preparar una campaña','Comprobar los resultados','Cómo funciona','Guía de uso'])
+    page=st.radio('¿Qué necesitas hacer?',['Guía de uso','Resumen del negocio','Conocer a un cliente','Entender los grupos','Preparar una campaña','Comprobar los resultados','Cómo funciona'])
     st.divider()
     st.caption('Demostración histórica · 01/04/2018\n\nPrevisión: próximos 3 meses.\n\nMoneda: real brasileño (BRL). No se convierten importes a euros.')
     if st.button('Actualizar datos del panel',width="stretch"):
