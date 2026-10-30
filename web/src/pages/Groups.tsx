@@ -31,15 +31,15 @@ export default function GroupsPage() {
         <ul className="space-y-2" aria-label="Grupos de clientes">
           <li>
             <button onClick={() => setSel(null)} aria-pressed={sel === null}
-              className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${sel === null ? 'border-accent bg-accent/10' : 'border-line hover:border-muted'}`}>
+              className={`w-full rounded-2xl border px-4 py-3.5 text-left transition-all ${sel === null ? 'border-accent bg-accent/10' : 'glass hover:-translate-y-0.5'}`}>
               <span className="font-medium">Todos los grupos</span>
               <span className="num block text-sm text-muted">{num(data.total)} clientes</span>
             </button>
           </li>
           {data.profiles.map(p => (
             <li key={p.segment}>
-              <button onClick={() => setSel(p.segment)} aria-pressed={sel === p.segment}
-                className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${sel === p.segment ? 'border-accent bg-accent/10' : 'border-line hover:border-muted'}`}>
+              <button onClick={() => setSel(p.segment)} aria-pressed={sel === p.segment} style={sel === p.segment ? { borderColor: groupColor(p.segment), boxShadow: `0 0 28px -8px ${groupColor(p.segment)}` } : undefined}
+                className={`w-full rounded-2xl border px-4 py-3.5 text-left transition-all ${sel === p.segment ? 'bg-accent/10' : 'glass hover:-translate-y-0.5'}`}>
                 <span className="flex items-center gap-2.5 font-medium"><span className="size-3 rounded-full" style={{ background: groupColor(p.segment) }} />{p.name}</span>
                 <span className="num mt-0.5 block pl-[22px] text-sm text-muted">{num(p.customers)} clientes · {pct(p.customers / data.total)}</span>
                 <span className="mt-2 block h-1 overflow-hidden rounded-full bg-line"><motion.span className="block h-full rounded-full" style={{ background: groupColor(p.segment) }} initial={{ width: 0 }} animate={{ width: `${(p.customers / data.total) * 100}%` }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} /></span>
@@ -49,8 +49,8 @@ export default function GroupsPage() {
         </ul>
 
         <div className="space-y-6">
-          <div className="relative h-[420px] overflow-hidden rounded-3xl border border-line bg-surface sm:h-[500px]">
-            <Constellation points={data.points} active={sel} onHover={onHover} orbit={sel === null} className="size-full" />
+          <div className="bento relative h-[440px] overflow-hidden sm:h-[560px]">
+            <Constellation points={data.points} active={sel} onHover={onHover} orbit={sel === null} camera labels={data.profiles.map(p => ({ segment: p.segment, name: p.name }))} className="size-full" />
             {hover && (
               <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-[130%] rounded-xl border border-line bg-raised px-3 py-2 text-sm shadow-xl" style={{ left: hover.x, top: hover.y }}>
                 <div className="font-medium">{(hover as HoverPoint & { client_label?: string }).client_label}</div>
@@ -63,8 +63,8 @@ export default function GroupsPage() {
           <AnimatePresence mode="wait">
             <motion.div key={sel ?? 'all'} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.22 }}>
               {current ? (
-                <article className="rounded-3xl border border-line bg-surface p-6 sm:p-8" style={{ borderTopColor: groupColor(current.segment), borderTopWidth: 3 }}>
-                  <h2 className="text-3xl font-semibold">{current.name}</h2>
+                <article className="bento p-7 sm:p-10" style={{ borderTopColor: groupColor(current.segment), borderTopWidth: 3 }}>
+                  <h2 className="headline !text-4xl">{current.name}</h2>
                   <p className="num mt-1 text-muted">{num(current.customers)} clientes · gasto previsto medio {money(current.clv_pred)}</p>
                   <dl className="mt-6 grid gap-x-10 gap-y-5 sm:grid-cols-2">
                     <div><dt className="font-medium">Qué observamos</dt><dd className="mt-1 text-muted">{current.reason.replace(/gasto estimado medio .*$/, `gasto estimado medio ${money(current.clv_pred)}.`)}</dd></div>
@@ -74,7 +74,7 @@ export default function GroupsPage() {
                   </dl>
                 </article>
               ) : (
-                <p className="rounded-3xl border border-dashed border-line p-6 text-muted">Elige un grupo para ver qué lo distingue, qué acción probar y qué medir. El resto de clientes se atenúa en el mapa.</p>
+                <p className="glass rounded-3xl p-6 text-muted">Elige un grupo para ver qué lo distingue, qué acción probar y qué medir. El resto de clientes se atenúa en el mapa.</p>
               )}
             </motion.div>
           </AnimatePresence>

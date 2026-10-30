@@ -41,7 +41,7 @@ export default function Guide() {
       </ol>
 
       <section className="mt-20 max-w-3xl">
-        <h2 className="text-3xl font-semibold">Diccionario sin tecnicismos</h2>
+        <h2 className="headline !text-4xl">Diccionario sin tecnicismos</h2>
         <div className="relative mt-6">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
           <input className="field !pl-10" placeholder="Busca un concepto" aria-label="Buscar en el diccionario" value={q} onChange={e => setQ(e.target.value)} />
@@ -58,7 +58,7 @@ export default function Guide() {
       </section>
 
       <section className="mt-20 max-w-3xl">
-        <h2 className="text-3xl font-semibold">Antes de presentar o utilizar la herramienta</h2>
+        <h2 className="headline !text-4xl">Antes de presentar o utilizar la herramienta</h2>
         <p className="mt-3 max-w-[62ch] text-muted">Aclara el escenario, la fecha histórica y la moneda. No atribuyas ventas a una campaña no ejecutada. No presentes afinidades como probabilidades. Muestra también los modelos que superan a la red y los requisitos pendientes.</p>
         <p className="mt-3 text-sm text-muted">Para instalar y entrenar: README.md. Para justificar decisiones: docs/metodologia.md. Para revisar el alcance: docs/cobertura.md.</p>
       </section>

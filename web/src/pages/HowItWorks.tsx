@@ -46,8 +46,8 @@ export default function HowItWorks() {
       </ol>
 
       <section className="mt-24">
-        <h2 className="text-3xl font-semibold">Qué sabe el sistema y qué no sabe</h2>
-        <dl className="mt-8 grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-2">
+        <h2 className="headline !text-4xl">Qué sabe el sistema y qué no sabe</h2>
+        <dl className="mt-8 grid gap-px overflow-hidden rounded-3xl bg-line sm:grid-cols-2">
           {KNOWS.map(([t, d, ok]) => (
             <div key={t} className="bg-surface p-6">
               <dt className="flex items-center gap-2 font-display text-lg font-semibold">
@@ -60,7 +60,7 @@ export default function HowItWorks() {
       </section>
 
       <section className="mt-24">
-        <h2 className="text-3xl font-semibold">Protocolo: el modelo nunca ve el futuro</h2>
+        <h2 className="headline !text-4xl">Protocolo: el modelo nunca ve el futuro</h2>
         <p className="mt-3 max-w-[62ch] text-muted">Las entradas usan compras anteriores a cada corte. Las etiquetas son el gasto y los productos de los tres meses siguientes. Las ventanas no se solapan.</p>
         <div className="mt-10 grid gap-4 md:grid-cols-3">
           {WINDOWS.map((w, i) => (
